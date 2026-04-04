@@ -1,0 +1,15 @@
+/* PDFCanvasViewer.css */
+.pdf-canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Escala para pantallas más pequeñas */
+@media (max-width: 768px) {
+    .pdf-canvas {
+        transform: scale(0.7);
+        transform-origin: top left; /* Asegura que el escalado se haga desde la esquina superior izquierda */
+        width: calc(100% / 0.7); /* Ajusta el ancho para compensar la escala */
+        height: auto;
+    }
+}

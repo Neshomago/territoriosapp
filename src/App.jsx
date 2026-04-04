@@ -1,0 +1,44 @@
+import './App.css'
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { Home } from './components/Home.jsx';
+import { AdminPanel } from './components/AdminPanel.jsx';
+import { ErrorPage } from './components/ErrorPage.jsx';
+import LoginPage from './components/LoginPage.jsx';
+import { GroupSelector } from './components/GroupSelector.jsx';
+import { PDFVisualizer } from './components/PDFVisualizer.jsx'
+import { PDFPageInfoEdit } from './components/PDFPageInfoEdit.jsx'
+import { PrivateRoutes } from './components/PrivateRoutes.jsx';
+import { AuthProvider } from './components/AuthProvider.jsx';
+import { DatosGrupoProvider } from './components/contexts/grupoContext.jsx';
+import { GroupSelectorRenamer } from './components/GroupSelectorRenamer.jsx';
+
+function App() {
+
+  return (
+    <>
+      <AuthProvider>
+          <DatosGrupoProvider>
+            <BrowserRouter>
+              <Routes>
+
+                <Route path="/" element={<PrivateRoutes/>}>
+                  <Route index element={<Home/>}/>
+                  <Route path='home' element={<Home/>}/>
+                  <Route path='/grupo' element={<GroupSelector/>}/>
+                  <Route path='/grouprenamer' element={<GroupSelectorRenamer/>}/>
+                  <Route path='/pdfvisualizer' element={<PDFVisualizer/>}/>
+                  <Route path='/pdfpageinfoedit' element={<PDFPageInfoEdit />} />
+                  <Route path='/adminpanel' element={<AdminPanel/>}/>
+                  <Route path='*' element={<ErrorPage/>}/>
+                </Route>
+                  <Route path='/login' element={<LoginPage/>}/>
+
+              </Routes>
+            </BrowserRouter>
+          </DatosGrupoProvider>
+      </AuthProvider>
+    </>
+  )
+}
+
+export default App
