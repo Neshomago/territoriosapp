@@ -249,71 +249,93 @@ export const PDFVisualizer = () => {
     return (
         <>
             <NavbarApp />
-            <div className="p-4 max-w-5xl mx-auto pb-24">
-                <Card className="mb-4 shadow-sm">
-                    <CardBody>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                            <div>
-                                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                                    📄 Formulario S-13-S (PDF)
-                                </h1>
-                                <p className="text-xs text-gray-500">
-                                    Registro de asignación de territorio oficial para la congregación.
-                                </p>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                                <div className="w-48">
-                                    <Select
-                                        variant='bordered'
-                                        size="sm"
-                                        label="Grupo"
-                                        selectedKeys={[nombreGrupo]}
-                                        onChange={(e) => setNombreGrupo(e.target.value)}
-                                    >
-                                        {Object.keys(territorios).map(
-                                            (territorio) => <SelectItem key={territorio} value={territorio}>{territorio}</SelectItem>
-                                        )}
-                                    </Select>
-                                </div>
-                                <Button
-                                    size="sm"
-                                    color="secondary"
-                                    variant="flat"
-                                    onPress={() => navigate('/foliotable')}
-                                >
-                                    📊 Editar en Tabla
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    color="default"
-                                    variant="bordered"
-                                    onPress={() => navigate('/grupo')}
-                                >
-                                    🗺️ Ver Mapa
-                                </Button>
-                            </div>
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-nav-safe">
+                
+                {/* Header & Controls Card */}
+                <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-ambient border border-surface-container mb-6">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        <div>
+                            <span className="font-mono text-xs font-semibold text-primary uppercase tracking-wider block">
+                                Documentación y Reportes
+                            </span>
+                            <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mt-1">
+                                Formulario PDF S-13-S
+                            </h1>
+                            <p className="text-xs text-on-surface-variant mt-0.5">
+                                Registro oficial de asignación de territorios para la congregación.
+                            </p>
                         </div>
-                    </CardBody>
-                </Card>
 
+                        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                            <div className="w-48">
+                                <Select
+                                    variant="bordered"
+                                    size="sm"
+                                    label="Grupo"
+                                    selectedKeys={[nombreGrupo]}
+                                    onChange={(e) => setNombreGrupo(e.target.value)}
+                                    classNames={{
+                                        trigger: "rounded-2xl border-surface-container bg-surface-container-low/50",
+                                    }}
+                                >
+                                    {Object.keys(territorios).map(
+                                        (territorio) => <SelectItem key={territorio} value={territorio}>{territorio}</SelectItem>
+                                    )}
+                                </Select>
+                            </div>
+                            
+                            <Button
+                                size="sm"
+                                color="secondary"
+                                variant="flat"
+                                onPress={() => navigate('/foliotable')}
+                                className="rounded-full font-bold"
+                                startContent={<span className="material-symbols-outlined text-[18px]">table_chart</span>}
+                            >
+                                Editar en Tabla
+                            </Button>
+                            <Button
+                                size="sm"
+                                color="primary"
+                                variant="flat"
+                                onPress={() => navigate('/grupo')}
+                                className="rounded-full font-bold"
+                                startContent={<span className="material-symbols-outlined text-[18px]">map</span>}
+                            >
+                                Ver Manzanas
+                            </Button>
+                        </div>
+                    </div>
+                </section>
+
+                {/* PDF Viewer Container */}
                 {loading ? (
-                    <div className="flex justify-center my-12">
-                        <p className="text-sm text-gray-600">Generando documento PDF...</p>
+                    <div className="flex flex-col justify-center items-center py-24 bg-white rounded-3xl shadow-ambient border border-surface-container">
+                        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-3"></div>
+                        <p className="text-sm font-semibold text-primary">Generando documento oficial S-13-S...</p>
+                        <p className="text-xs text-on-surface-variant mt-1">Renderizando asignaciones de territorio del Grupo {nombreGrupo}</p>
                     </div>
                 ) : pdfUrl ? (
-                    <Card className="shadow-md p-4">
-                        <div className="flex justify-between items-center mb-3">
-                            <span className="text-xs font-semibold text-gray-700">
-                                Vista Previa • Formulario S-13-S Grupo {nombreGrupo} ({adjustedYear})
-                            </span>
+                    <section className="bg-white rounded-3xl shadow-ambient border border-surface-container p-5 sm:p-6">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-4 border-b border-surface-container">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[22px] text-primary">description</span>
+                                <div>
+                                    <h3 className="text-sm font-bold text-on-surface">
+                                        Vista Previa • Formulario S-13-S (Grupo {nombreGrupo})
+                                    </h3>
+                                    <span className="text-xs font-mono text-on-surface-variant">Año de Servicio {adjustedYear}</span>
+                                </div>
+                            </div>
+                            
                             <a
                                 href={pdfUrl}
                                 target="_blank"
                                 download={`S-13-S_${nombreGrupo}_${adjustedYear}.pdf`}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-full shadow-sm transition-all flex items-center gap-1.5 active-scale"
                             >
-                                ⬇️ Descargar PDF
+                                <span className="material-symbols-outlined text-[18px]">download</span>
+                                <span>Descargar PDF</span>
                             </a>
                         </div>
 
@@ -324,16 +346,21 @@ export const PDFVisualizer = () => {
                                 key={nombreGrupo}
                                 src={pdfUrl}
                                 width="100%"
-                                height="650px"
-                                className="border rounded-lg"
+                                height="700px"
+                                className="border border-surface-container rounded-2xl bg-surface-container-low"
                                 title="Vista previa del PDF"
                             />
                         )}
-                    </Card>
+                    </section>
                 ) : (
-                    <p className="text-red-500">No se pudo generar el PDF.</p>
+                    <div className="p-8 text-center bg-white rounded-3xl shadow-ambient border border-red-200">
+                        <p className="text-red-600 font-semibold text-sm">No se pudo generar el documento PDF.</p>
+                        <Button size="sm" color="primary" variant="flat" onPress={() => window.location.reload()} className="mt-3 rounded-full">
+                            Reintentar
+                        </Button>
+                    </div>
                 )}
-            </div>
+            </main>
             <FooterNavbar />
         </>
     );

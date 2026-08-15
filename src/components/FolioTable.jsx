@@ -1,15 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { 
-  Table, 
-  TableHeader, 
-  TableColumn, 
-  TableBody, 
-  TableRow, 
-  TableCell, 
   Button, 
-  Card, 
-  CardBody, 
-  CardHeader, 
   Select, 
   SelectItem, 
   Input, 
@@ -35,7 +26,6 @@ export const FolioTable = () => {
     folioRecords, 
     saveFolioRecord, 
     deleteFolioRecord, 
-    bulkUpdateFolioRecords, 
     territorioActivo 
   } = useDatosGrupoContext();
 
@@ -59,9 +49,6 @@ export const FolioTable = () => {
     yearServicio: defaultServiceYear,
     completado: true
   });
-
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [localRows, setLocalRows] = useState([]);
 
   // Extraer número de territorios totales del grupo
   const totalTerritorios = useMemo(() => {
@@ -178,117 +165,144 @@ export const FolioTable = () => {
   return (
     <>
       <NavbarApp />
-      <div className="p-4 max-w-7xl mx-auto pb-28">
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-nav-safe">
         
-        {/* Cabecera y Controles */}
-        <Card className="mb-4 shadow-sm">
-          <CardBody>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                  📊 Editor de Folio S-13-S
-                </h1>
-                <p className="text-xs text-gray-500">
-                  Revisa, audita y edita las asignaciones de territorios antes de emitir el formulario oficial S-13-S.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <div className="w-48">
-                  <Select 
-                    variant="bordered"
-                    size="sm"
-                    label="Grupo"
-                    selectedKeys={[nombreGrupo]}
-                    onChange={(e) => setNombreGrupo(e.target.value)}
-                  >
-                    {Object.keys(territorios).map((g) => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </Select>
-                </div>
-
-                <div className="w-36">
-                  <Input 
-                    size="sm"
-                    variant="bordered"
-                    label="Año de servicio"
-                    value={serviceYear}
-                    onValueChange={setServiceYear}
-                  />
-                </div>
-
-                <Button 
-                  size="sm"
-                  color="secondary"
-                  variant="solid"
-                  onPress={() => handleOpenCreateModal(1)}
-                >
-                  ➕ Nueva Asignación
-                </Button>
-
-                <Button 
-                  size="sm"
-                  color="success"
-                  variant="solid"
-                  onPress={handleGoToPDF}
-                  className="font-semibold"
-                >
-                  📄 Generar PDF S-13-S
-                </Button>
-              </div>
+        {/* Header & Controls */}
+        <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-ambient border border-surface-container mb-6">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+            <div>
+              <span className="font-mono text-xs font-semibold text-primary uppercase tracking-wider block">
+                Registro Oficial Teocrático
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mt-1">
+                Editor de Folio S-13-S
+              </h1>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Audita y administra las asignaciones de territorios antes de emitir el formulario oficial.
+              </p>
             </div>
-          </CardBody>
-        </Card>
+
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              <div className="w-44">
+                <Select 
+                  variant="bordered"
+                  size="sm"
+                  label="Grupo"
+                  selectedKeys={[nombreGrupo]}
+                  onChange={(e) => setNombreGrupo(e.target.value)}
+                  classNames={{
+                    trigger: "rounded-2xl border-surface-container bg-surface-container-low/50",
+                  }}
+                >
+                  {Object.keys(territorios).map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="w-32">
+                <Input 
+                  size="sm"
+                  variant="bordered"
+                  label="Año servicio"
+                  value={serviceYear}
+                  onValueChange={setServiceYear}
+                  classNames={{
+                    inputWrapper: "rounded-2xl border-surface-container bg-surface-container-low/50",
+                  }}
+                />
+              </div>
+
+              <Button 
+                size="sm"
+                color="secondary"
+                variant="flat"
+                onPress={() => handleOpenCreateModal(1)}
+                className="rounded-full font-bold"
+                startContent={<span className="material-symbols-outlined text-[18px]">add</span>}
+              >
+                Nueva Asignación
+              </Button>
+
+              <Button 
+                size="sm"
+                color="primary"
+                variant="solid"
+                onPress={handleGoToPDF}
+                className="rounded-full font-bold shadow-sm"
+                startContent={<span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>}
+              >
+                Generar PDF S-13-S
+              </Button>
+            </div>
+          </div>
+        </section>
 
         {/* Tabla Principal S-13-S */}
-        <Card className="shadow-md overflow-hidden">
-          <CardHeader className="bg-gray-100 border-b px-4 py-3 flex justify-between items-center">
-            <span className="font-bold text-sm text-gray-700">
-              Registros del Grupo {nombreGrupo} • Año de Servicio {serviceYear} ({folioRecords.length} asignaciones registradas)
-            </span>
-            <Button size="sm" variant="light" color="primary" onPress={handleGoToMap}>
-              🗺️ Ir al Marcador de Manzanas
+        <section className="bg-white rounded-3xl shadow-ambient border border-surface-container overflow-hidden">
+          <div className="bg-surface-container-low/60 border-b border-surface-container px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-on-surface">
+                Grupo <span className="text-primary">{nombreGrupo}</span> • Año de Servicio {serviceYear}
+              </span>
+              <Chip size="sm" variant="flat" className="font-mono text-xs bg-purple-100 text-primary">
+                {folioRecords.length} asignaciones
+              </Chip>
+            </div>
+            <Button 
+              size="sm" 
+              variant="light" 
+              color="primary" 
+              onPress={handleGoToMap}
+              className="rounded-full font-semibold text-xs"
+              startContent={<span className="material-symbols-outlined text-[16px]">map</span>}
+            >
+              Ver Cuadrícula de Manzanas
             </Button>
-          </CardHeader>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-gray-200 text-gray-700 uppercase font-semibold border-b border-gray-300">
-                  <th className="p-2 border-r border-gray-300 text-center w-14">Núm. Terr.</th>
-                  <th className="p-2 border-r border-gray-300 text-center w-24">Última Fecha Completado</th>
-                  <th className="p-2 border-r border-gray-300 text-center" colSpan={3}>Asignación 1</th>
-                  <th className="p-2 border-r border-gray-300 text-center" colSpan={3}>Asignación 2</th>
-                  <th className="p-2 border-r border-gray-300 text-center" colSpan={3}>Asignación 3</th>
-                  <th className="p-2 border-r border-gray-300 text-center" colSpan={3}>Asignación 4</th>
-                  <th className="p-2 text-center w-16">Acciones</th>
+                <tr className="bg-surface-container-low text-on-surface uppercase font-mono font-bold text-[11px] border-b border-surface-container">
+                  <th className="p-3 border-r border-surface-container text-center w-14">Terr.</th>
+                  <th className="p-3 border-r border-surface-container text-center w-28">Última Fecha</th>
+                  <th className="p-3 border-r border-surface-container text-center" colSpan={3}>Asignación 1</th>
+                  <th className="p-3 border-r border-surface-container text-center" colSpan={3}>Asignación 2</th>
+                  <th className="p-3 border-r border-surface-container text-center" colSpan={3}>Asignación 3</th>
+                  <th className="p-3 border-r border-surface-container text-center" colSpan={3}>Asignación 4</th>
+                  <th className="p-3 text-center w-14">Acción</th>
                 </tr>
-                <tr className="bg-gray-100 text-gray-600 font-medium border-b border-gray-300 text-[11px]">
-                  <th className="p-1 border-r border-gray-300"></th>
-                  <th className="p-1 border-r border-gray-300"></th>
+                <tr className="bg-surface-container-lowest text-on-surface-variant font-medium border-b border-surface-container text-[10px]">
+                  <th className="p-1 border-r border-surface-container"></th>
+                  <th className="p-1 border-r border-surface-container"></th>
                   {[1, 2, 3, 4].map((i) => (
                     <React.Fragment key={i}>
-                      <th className="p-1 border-r border-gray-200">Publicador</th>
-                      <th className="p-1 border-r border-gray-200 w-16 text-center">Inicio</th>
-                      <th className="p-1 border-r border-gray-300 w-16 text-center">Fin</th>
+                      <th className="p-1.5 border-r border-surface-container font-semibold">Publicador</th>
+                      <th className="p-1.5 border-r border-surface-container w-16 text-center">Inicio</th>
+                      <th className="p-1.5 border-r border-surface-container w-16 text-center">Fin</th>
                     </React.Fragment>
                   ))}
                   <th className="p-1"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 bg-white">
+              <tbody className="divide-y divide-surface-container bg-white">
                 {groupedTerritories.map((row) => {
                   return (
-                    <tr key={row.territoryNumber} className="hover:bg-blue-50 transition-colors">
+                    <tr key={row.territoryNumber} className="hover:bg-purple-50/40 transition-colors">
                       {/* Número de Territorio */}
-                      <td className="p-2 border-r border-gray-300 text-center font-bold text-gray-800 bg-gray-50">
-                        {row.territoryNumber}
+                      <td className="p-3 border-r border-surface-container text-center font-extrabold text-primary bg-surface-container-lowest/50 font-mono">
+                        #{row.territoryNumber}
                       </td>
 
                       {/* Última fecha completado */}
-                      <td className="p-2 border-r border-gray-300 text-center font-mono text-gray-600 bg-gray-50">
-                        {row.lastCompletedDate || '—'}
+                      <td className="p-3 border-r border-surface-container text-center font-mono text-on-surface-variant bg-surface-container-lowest/50">
+                        {row.lastCompletedDate ? (
+                          <span className="font-semibold text-emerald-700">{row.lastCompletedDate}</span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
 
                       {/* 4 Columnas de Asignaciones */}
@@ -297,16 +311,19 @@ export const FolioTable = () => {
                         return (
                           <React.Fragment key={colIdx}>
                             {/* Publicador */}
-                            <td className="p-2 border-r border-gray-200 font-medium">
+                            <td className="p-2.5 border-r border-surface-container font-medium">
                               {assign ? (
-                                <div className="flex items-center justify-between group">
-                                  <span className="truncate max-w-[100px]">{assign.publicador || 'Sin nombre'}</span>
+                                <div className="flex items-center justify-between group gap-1">
+                                  <span className="truncate max-w-[95px] font-semibold text-on-surface">
+                                    {assign.publicador || 'Sin nombre'}
+                                  </span>
                                   <button 
+                                    type="button"
                                     onClick={() => handleOpenEditModal(assign)} 
-                                    className="opacity-0 group-hover:opacity-100 text-blue-600 hover:text-blue-800 ml-1 text-xs"
-                                    title="Editar"
+                                    className="opacity-0 group-hover:opacity-100 text-primary hover:text-primary-dark transition-opacity"
+                                    title="Editar asignación"
                                   >
-                                    ✏️
+                                    <span className="material-symbols-outlined text-[14px]">edit</span>
                                   </button>
                                 </div>
                               ) : (
@@ -315,22 +332,25 @@ export const FolioTable = () => {
                             </td>
 
                             {/* Fecha Inicio */}
-                            <td className="p-2 border-r border-gray-200 text-center font-mono text-[11px]">
+                            <td className="p-2.5 border-r border-surface-container text-center font-mono text-[11px] text-on-surface-variant">
                               {assign?.fechaInicio || '—'}
                             </td>
 
                             {/* Fecha Fin */}
-                            <td className="p-2 border-r border-gray-300 text-center font-mono text-[11px]">
+                            <td className="p-2.5 border-r border-surface-container text-center font-mono text-[11px]">
                               {assign ? (
                                 <div className="flex items-center justify-center gap-1">
-                                  <span>{assign.fechaFin || 'En curso'}</span>
+                                  <span className={assign.fechaFin ? 'text-emerald-700 font-medium' : 'text-amber-600 font-medium'}>
+                                    {assign.fechaFin || 'En curso'}
+                                  </span>
                                   {assign.id && (
                                     <button 
+                                      type="button"
                                       onClick={() => handleDeleteRecord(assign.id, row.territoryNumber)}
-                                      className="text-red-400 hover:text-red-600 text-[10px]"
+                                      className="text-red-400 hover:text-red-600 opacity-60 hover:opacity-100 transition-opacity"
                                       title="Eliminar esta asignación"
                                     >
-                                      ❌
+                                      <span className="material-symbols-outlined text-[14px]">delete</span>
                                     </button>
                                   )}
                                 </div>
@@ -344,16 +364,14 @@ export const FolioTable = () => {
 
                       {/* Acciones de Fila */}
                       <td className="p-2 text-center">
-                        <Button 
-                          size="sm" 
-                          variant="light" 
-                          color="primary"
-                          className="min-w-0 px-2 h-7"
-                          onPress={() => handleOpenCreateModal(row.territoryNumber)}
+                        <button 
+                          type="button"
+                          onClick={() => handleOpenCreateModal(row.territoryNumber)}
+                          className="w-7 h-7 rounded-full bg-primary/10 text-primary hover:bg-primary hover:text-white flex items-center justify-center mx-auto transition-all active-scale"
                           title="Añadir asignación a este territorio"
                         >
-                          ➕
-                        </Button>
+                          <span className="material-symbols-outlined text-[16px]">add</span>
+                        </button>
                       </td>
                     </tr>
                   );
@@ -361,36 +379,51 @@ export const FolioTable = () => {
               </tbody>
             </table>
           </div>
-        </Card>
-      </div>
+        </section>
+      </main>
 
       {/* Modal de Creación / Edición de Asignación */}
-      <Modal isOpen={isOpen} onClose={onClose} placement="center">
+      <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        placement="center"
+        classNames={{
+          base: "rounded-3xl shadow-ambient-hover",
+        }}
+      >
         <ModalContent>
-          <ModalHeader className="border-b">
-            {modalMode === 'create' ? '➕ Registrar Nueva Asignación' : '📝 Editar Asignación'}
+          <ModalHeader className="font-bold text-base text-on-surface px-6 pt-5 pb-0">
+            {modalMode === 'create' ? 'Registrar Nueva Asignación' : 'Editar Asignación'}
           </ModalHeader>
-          <ModalBody className="py-4 flex flex-col gap-3">
+          <ModalBody className="p-6 flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-3">
               <Input 
                 type="number"
                 label="Número de Territorio"
                 value={String(currentEditRecord.territorioNumero)}
                 onValueChange={(val) => setCurrentEditRecord(prev => ({ ...prev, territorioNumero: parseInt(val) || 1 }))}
+                classNames={{
+                  inputWrapper: "rounded-xl bg-white border-surface-container",
+                }}
               />
               <Input 
                 label="Año de Servicio"
                 value={currentEditRecord.yearServicio}
                 onValueChange={(val) => setCurrentEditRecord(prev => ({ ...prev, yearServicio: val }))}
+                classNames={{
+                  inputWrapper: "rounded-xl bg-white border-surface-container",
+                }}
               />
             </div>
 
-            {/* 0.1 Campo para Editar Nombre del Publicador */}
             <Input 
               label="Publicador Asignado"
               placeholder="Ej: D. Cabrera o M. Tinoco"
               value={currentEditRecord.publicador}
               onValueChange={(val) => setCurrentEditRecord(prev => ({ ...prev, publicador: val }))}
+              classNames={{
+                inputWrapper: "rounded-xl bg-white border-surface-container",
+              }}
             />
 
             <div className="grid grid-cols-2 gap-3">
@@ -399,21 +432,27 @@ export const FolioTable = () => {
                 placeholder="Ej: 05/24/2025"
                 value={currentEditRecord.fechaInicio}
                 onValueChange={(val) => setCurrentEditRecord(prev => ({ ...prev, fechaInicio: val }))}
+                classNames={{
+                  inputWrapper: "rounded-xl bg-white border-surface-container",
+                }}
               />
               <Input 
                 label="Fecha de Fin (MM/DD/YYYY)"
                 placeholder="Ej: 07/24/2025"
                 value={currentEditRecord.fechaFin}
                 onValueChange={(val) => setCurrentEditRecord(prev => ({ ...prev, fechaFin: val }))}
+                classNames={{
+                  inputWrapper: "rounded-xl bg-white border-surface-container",
+                }}
               />
             </div>
           </ModalBody>
-          <ModalFooter className="border-t">
-            <Button variant="light" color="danger" onPress={onClose}>
+          <ModalFooter className="px-6 pb-5 pt-0">
+            <Button variant="light" color="danger" onPress={onClose} className="rounded-full font-semibold">
               Cancelar
             </Button>
-            <Button color="primary" onPress={handleSaveModalRecord}>
-              💾 Guardar Registro
+            <Button color="primary" onPress={handleSaveModalRecord} className="rounded-full font-bold shadow-sm">
+              Guardar Registro
             </Button>
           </ModalFooter>
         </ModalContent>
