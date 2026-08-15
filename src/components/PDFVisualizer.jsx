@@ -1,362 +1,342 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import NavbarApp from './NavbarApp';
 import FooterNavbar from './FooterNavbar';
-
 import { PDFDocument } from "pdf-lib";
-import { territorios, posicionPaginaDos, posicionPaginaUno } from "./utils/_utils";
+import { territorios } from "./utils/_utils";
 import { useDatosGrupoContext } from "./contexts/grupoContext";
-import { Select, SelectItem } from "@heroui/react";
+import { Select, SelectItem, Button, Card, CardBody } from "@heroui/react";
+import { useNavigate } from "react-router-dom";
 import PDFCanvasViewer from "./PDFCanvasViewer";
-import { data } from "autoprefixer";
 
 export const PDFVisualizer = () => {
     const esMovil = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const navigate = useNavigate();
 
     const pdfRoute = "/S-13_S.pdf";
-    const { setNombreGrupo, nombreGrupo, getDataDeGrupo, dataDeGrupo } = useDatosGrupoContext();
-    
-    const [territoriosState] = useState(territorios);
+    const {
+        setNombreGrupo,
+        nombreGrupo,
+        folioRecords,
+        territorioActivo,
+        dataDeGrupo
+    } = useDatosGrupoContext();
+
     const [pdfUrl, setPdfUrl] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    //revisa que año teocrático es
+    // Año teocrático ajustado (inicia en septiembre)
     const now = new Date();
     const year = now.getFullYear();
     const adjustedYear = now.getMonth() >= 8 ? year + 1 : year;
 
-    // Función para extraer todas las asignaciones (rows) de todas las columnas de Firebase
-    const getAllAssignmentsFromFirebase = (pages) => {
-        const allAssignments = [];
+    // Constantes de layout del formulario S-13-S
+    const ROWS_PER_PDF_PAGE = 20;       // Filas de territorio por página
+    const ASSIGNMENTS_PER_ROW = 4;     // Máximo 4 columnas "Asignado a" por fila
+    const ROW_HEIGHT = 31;              // Altura de cada fila de territorio (px)
+    const SUB_ROW_OFFSET = 14;         // Distancia entre sub-fila nombre y sub-fila fechas
 
-        console.log('pages: ', pages);
-        
-        // Recorrer todas las páginas y columnas de Firebase
-        pages.forEach(page => {
-            console.log('page: ', page);
-            
-            page.columns.forEach(column => {
-                // Agregar cada row con información del territorio
-                if (column.rows && column.rows.length > 0) {
-                    column.rows.forEach(row => {
-                        console.log('fila:',row);
-                        
-                        allAssignments.push({
-                            territoryNumber: column.name,
-                            name: row.name,
-                            startDate: row.startDate,
-                            endDate: row.endDate,
-                            firebasePage: page.page,
-                            completed: column.completed
-                        });
+    // Posición X de cada sección del formulario
+    const COL_TERRITORY_X = 38;        // Col 1: Núm. de terr.
+    const COL_LAST_DATE_X = 72;       // Col 2: Última fecha en que se completó
+    const ASSIGNMENT_COLS = [
+        { nameX: 139, startDateX: 139, endDateX: 194 },   // Asignado a #1
+        { nameX: 245, startDateX: 245, endDateX: 300 },   // Asignado a #2
+        { nameX: 351, startDateX: 351, endDateX: 406 },   // Asignado a #3
+        { nameX: 457, startDateX: 457, endDateX: 512 },   // Asignado a #4
+    ];
+
+    const NAME_SIZE = 9;
+    const DATE_SIZE = 9;
+    const TERR_NUM_SIZE = 9;
+    const FIRST_ROW_Y = 685;   // Y de la primera fila de datos en la página
+
+    // Extraer número de territorios totales del grupo
+    const totalTerritorios = useMemo(() => {
+        if (territorioActivo?.mapa?.area) {
+            return Object.keys(territorioActivo.mapa.area).length;
+        }
+        const staticGroup = territorios[nombreGrupo];
+        if (staticGroup?.mapa?.area) {
+            return Object.keys(staticGroup.mapa.area).length;
+        }
+        return 15;
+    }, [territorioActivo, nombreGrupo]);
+
+    /**
+     * Construye la lista de territorios para el PDF a partir de los registros planos (folioRecords).
+     */
+    const extractTerritoriesForPDF = () => {
+        // 1. Si tenemos folioRecords (Opción C)
+        if (folioRecords && folioRecords.length > 0) {
+            const list = [];
+            for (let num = 1; num <= totalTerritorios; num++) {
+                const recordsForTerr = folioRecords.filter(r => parseInt(r.territorioNumero) === num);
+                recordsForTerr.sort((a, b) => (a.fechaInicio || '').localeCompare(b.fechaInicio || ''));
+
+                const completedDates = recordsForTerr.filter(r => r.fechaFin).map(r => r.fechaFin);
+                const lastCompleted = completedDates.length > 0 ? completedDates[completedDates.length - 1] : '';
+
+                list.push({
+                    territoryNumber: num,
+                    lastCompletedDate: lastCompleted,
+                    assignments: recordsForTerr.map(r => ({
+                        name: r.publicador || '',
+                        startDate: r.fechaInicio || '',
+                        endDate: r.fechaFin || ''
+                    }))
+                });
+            }
+            return list;
+        }
+
+        // 2. Fallback a legacy dataDeGrupo.pages si existe
+        if (dataDeGrupo && dataDeGrupo.pages) {
+            const territories = [];
+            const sortedPages = [...dataDeGrupo.pages].sort((a, b) => a.page - b.page);
+            sortedPages.forEach(page => {
+                const sortedColumns = [...page.columns].sort((a, b) => parseInt(a.name) - parseInt(b.name));
+                sortedColumns.forEach(column => {
+                    const lastRow = column.rows && column.rows.length > 0 ? column.rows[column.rows.length - 1] : null;
+                    territories.push({
+                        territoryNumber: column.name,
+                        lastCompletedDate: lastRow ? lastRow.endDate : '',
+                        assignments: (column.rows || []).map(r => ({
+                            name: r.name || '',
+                            startDate: r.startDate || '',
+                            endDate: r.endDate || ''
+                        }))
+                    });
+                });
+            });
+            if (territories.length > 0) return territories;
+        }
+
+        // 3. Fallback a lista base numerada si no hay registros
+        const emptyList = [];
+        for (let num = 1; num <= totalTerritorios; num++) {
+            emptyList.push({
+                territoryNumber: num,
+                lastCompletedDate: '',
+                assignments: []
+            });
+        }
+        return emptyList;
+    };
+
+    /**
+     * Dibuja todos los territorios en una página del PDF.
+     */
+    const drawTerritoriesOnPage = (page, territoriesForPage) => {
+        let currentY = FIRST_ROW_Y;
+
+        territoriesForPage.forEach(territory => {
+            // Col 1: número de territorio
+            page.drawText(String(territory.territoryNumber), {
+                x: COL_TERRITORY_X + 10,
+                y: currentY - 5,
+                size: TERR_NUM_SIZE + 1
+            });
+
+            // Col 2: última fecha completada
+            if (territory.lastCompletedDate) {
+                page.drawText(String(territory.lastCompletedDate), {
+                    x: COL_LAST_DATE_X + 4,
+                    y: currentY - 5,
+                    size: DATE_SIZE + 1
+                });
+            }
+
+            // Cols 3–6: hasta 4 asignaciones en horizontal
+            territory.assignments.slice(0, ASSIGNMENTS_PER_ROW).forEach((assignment, i) => {
+                const col = ASSIGNMENT_COLS[i];
+
+                // Sub-fila superior: nombre de la persona
+                if (assignment.name) {
+                    const cleanName = String(assignment.name).slice(0, 16);
+                    page.drawText(cleanName, {
+                        x: col.nameX,
+                        y: currentY,
+                        size: NAME_SIZE
+                    });
+                }
+
+                // Sub-fila inferior izquierda: fecha de inicio
+                if (assignment.startDate) {
+                    page.drawText(String(assignment.startDate), {
+                        x: col.startDateX,
+                        y: currentY - SUB_ROW_OFFSET,
+                        size: DATE_SIZE
+                    });
+                }
+
+                // Sub-fila inferior derecha: fecha de fin
+                if (assignment.endDate) {
+                    page.drawText(String(assignment.endDate), {
+                        x: col.endDateX,
+                        y: currentY - SUB_ROW_OFFSET,
+                        size: DATE_SIZE
                     });
                 }
             });
+
+            currentY -= ROW_HEIGHT;
         });
-
-        console.log('AllAssignments: ', allAssignments);
-        
-        return allAssignments;
-    };
-
-    // Función para agrupar asignaciones en columnas del PDF (4 columnas por página)
-    const groupAssignmentsByPDFColumns = (assignments) => {
-        console.log('assigments per group: ', assignments);
-        
-        const pdfPages = [];
-        const columnsPerPage = 4;
-        const assignmentsPerColumn = Math.ceil(assignments.length / columnsPerPage);
-
-        // Si no hay suficientes asignaciones para llenar una página completa
-        if (assignments.length <= columnsPerPage) {
-            // Crear una sola fila con todas las asignaciones
-            pdfPages.push([assignments]);
-            console.log('pdfPages:', pdfPages);
-            
-            return pdfPages;
-        }
-        
-
-        // Dividir asignaciones en grupos para cada página del PDF
-        for (let pageIndex = 0; pageIndex < Math.ceil(assignments.length / (columnsPerPage * assignmentsPerColumn)); pageIndex++) {
-            const pageAssignments = [];
-            
-            // Crear 4 columnas por página
-            for (let colIndex = 0; colIndex < columnsPerPage; colIndex++) {
-                const columnAssignments = [];
-                const startIndex = (pageIndex * columnsPerPage * assignmentsPerColumn) + (colIndex * assignmentsPerColumn);
-                const endIndex = Math.min(startIndex + assignmentsPerColumn, assignments.length);
-                
-                for (let i = startIndex; i < endIndex; i++) {
-                    if (assignments[i]) {
-                        columnAssignments.push(assignments[i]);
-                    }
-                }
-                console.log('columnAssignments: ', columnAssignments);
-                
-                if (columnAssignments.length > 0) {
-                    pageAssignments.push(columnAssignments);
-                }
-            }
-            
-            if (pageAssignments.length > 0) {
-                pdfPages.push(pageAssignments);
-            }
-            console.log('forloop pageIndex pdfPages:', pdfPages);
-        }
-
-        return pdfPages;
-    };
-
-    // Función para verificar si necesitamos crear una nueva página en Firebase
-    const shouldCreateNewFirebasePage = (dataDeGrupo) => {
-        if (!dataDeGrupo.pages || dataDeGrupo.pages.length === 0) return false;
-        
-        const lastPage = dataDeGrupo.pages[dataDeGrupo.pages.length - 1];
-        const completedColumns = lastPage.columns.filter(col => col.completed).length;
-        
-        // Si la última página tiene 4 columnas completas, necesita nueva página
-        return completedColumns >= 4;
     };
 
     useEffect(() => {
-        if (nombreGrupo) {
-            getDataDeGrupo(nombreGrupo);
-        }
-    }, [nombreGrupo]);
-    
-    useEffect(() => {
-        if (!nombreGrupo || !dataDeGrupo || !dataDeGrupo.pages) return;
+        if (!nombreGrupo) return;
 
-        const fetchDataAndGeneratePDF = async () => {
+        const generatePDF = async () => {
             setLoading(true);
 
-            // Limpia la URL previa
             if (pdfUrl) {
                 URL.revokeObjectURL(pdfUrl);
                 setPdfUrl(null);
             }
 
             try {
-                // Obtener data desde Firebase
-                /* const dataPDF = await getDataDeGrupo(nombreGrupo);
-                if (!dataPDF || !dataPDF.pages) {
-                    console.error("Data del grupo inválida");
-                    return;
-                } */
+                // Cargar el PDF plantilla base
+                const templateArrayBuffer = await fetch(pdfRoute).then(res => res.arrayBuffer());
+                const pdfDoc = await PDFDocument.load(templateArrayBuffer);
 
-                const existingPDF = await fetch(pdfRoute).then((res) =>
-                    res.arrayBuffer()
-                );
+                // 1. Obtener territorios a imprimir
+                const allTerritories = extractTerritoriesForPDF();
 
-                const pdfDoc = await PDFDocument.load(existingPDF);
-                const pages = pdfDoc.getPages();
-                const firstPage = pages[0];
-                const secondPage = pages[1];
-
-                /**
-                 * Sección de Codigo sugerido por Claude.ai
-                 * Para dibujar en PDF lo que se tiene
-                 */
-
-                // Obtener todas las asignaciones de Firebase
-                const allAssignments = getAllAssignmentsFromFirebase(dataDeGrupo.pages);
-                console.log('Data de grupo:', dataDeGrupo);
-                console.log('Total asignaciones:', allAssignments.length);
-
-                // Agrupar asignaciones en columnas del PDF (4 columnas por página)
-                const pdfPageGroups = groupAssignmentsByPDFColumns(allAssignments);
-                console.log('Grupos de páginas PDF:', pdfPageGroups.length);
-
-                // Verificar si necesitamos crear nueva página en Firebase
-                const needsNewFirebasePage = shouldCreateNewFirebasePage(dataDeGrupo);
-                console.log('¿Necesita nueva página en Firebase?', needsNewFirebasePage);
-
-                // Dibujar año teocrático en ambas páginas
-                firstPage.drawText(`${adjustedYear}`, {x: 140, y: 750, size: 12});
-                if (secondPage) {
-                    secondPage.drawText(`${adjustedYear}`, {x: 140, y: 750, size: 12});
+                // 2. Dividir territorios en grupos de 20 por página
+                const pdfPageGroups = [];
+                for (let i = 0; i < allTerritories.length; i += ROWS_PER_PDF_PAGE) {
+                    pdfPageGroups.push(allTerritories.slice(i, i + ROWS_PER_PDF_PAGE));
+                }
+                if (pdfPageGroups.length === 0) {
+                    pdfPageGroups.push([]);
                 }
 
-                // Función mejorada para dibujar datos de asignaciones
-                const drawAssignmentsOnPage = (page, assignmentColumns, posicionConfig) => {
-                    // Dibujar encabezados de columnas
-                    Object.entries(posicionConfig.columns)
-                        .slice(0, assignmentColumns.length)
-                        .forEach(([_, value], index) => {
-                            if (assignmentColumns[index] && assignmentColumns[index].length > 0) {
-                                // Usar el primer territorio de la columna como encabezado
-                                const firstAssignment = assignmentColumns[index][0];
-                                page.drawText(firstAssignment.territoryNumber, value.params);
-                            }
-                        });
+                // 3. Agregar páginas al PDF si se necesitan más que la plantilla
+                const templateForCopy = await PDFDocument.load(templateArrayBuffer);
+                const templateLastPageIndex = templateForCopy.getPageCount() - 1;
+                while (pdfDoc.getPageCount() < pdfPageGroups.length) {
+                    const [blankPage] = await pdfDoc.copyPages(templateForCopy, [templateLastPageIndex]);
+                    pdfDoc.addPage(blankPage);
+                }
 
-                    // Dibujar datos de las asignaciones
-                    let initialX1 = 140;
-                    let initialX2 = 190;
-                    let initialY = 685;
-                    let initialY2 = 670;
-
-                    // Encontrar el máximo número de asignaciones entre todas las columnas
-                    const maxAssignments = Math.max(...assignmentColumns.map(col => col.length));
-
-                    // Dibujar asignación por asignación
-                    for (let assignmentIndex = 0; assignmentIndex < maxAssignments; assignmentIndex++) {
-                        initialX1 = 140;
-                        initialX2 = 190;
-
-                        assignmentColumns.forEach((columnAssignments, colIndex) => {
-                            if (columnAssignments[assignmentIndex]) {
-                                const assignment = columnAssignments[assignmentIndex];
-                                
-                                // Dibujar nombre
-                                page.drawText(assignment.name || '', { 
-                                    x: initialX1, 
-                                    y: initialY, 
-                                    size: 10 
-                                });
-                                // Dibujar fecha de inicio
-                                page.drawText(assignment.startDate || '', { 
-                                    x: initialX1, 
-                                    y: initialY2, 
-                                    size: 9 
-                                });
-                                // Dibujar fecha de fin
-                                page.drawText(assignment.endDate || '', { 
-                                    x: initialX2, 
-                                    y: initialY2, 
-                                    size: 9 
-                                });
-                            }
-                            initialX1 += 106;
-                            initialX2 += 106;
-                        });
-
-                        initialY -= 31;
-                        initialY2 -= 31;
+                // 4. Dibujar año teocrático, nombre del grupo y datos en cada página
+                const allPdfPages = pdfDoc.getPages();
+                pdfPageGroups.forEach((territoriesForPage, pageIndex) => {
+                    const page = allPdfPages[pageIndex];
+                    page.drawText(`${adjustedYear}`, { x: 140, y: 750, size: 12 });
+                    if (nombreGrupo) {
+                        page.drawText(`Grupo: ${nombreGrupo}`, { x: 220, y: 750, size: 12 });
                     }
-                };
+                    drawTerritoriesOnPage(page, territoriesForPage);
+                });
 
-                // Dibujar primera página del PDF (primeras 4 columnas de asignaciones)
-                if (pdfPageGroups[0]) {
-                    drawAssignmentsOnPage(firstPage, pdfPageGroups[0], posicionPaginaUno);
-                }
-
-                // Dibujar segunda página del PDF (siguientes 4 columnas de asignaciones) si existe
-                if (pdfPageGroups[1] && secondPage) {
-                    drawAssignmentsOnPage(secondPage, pdfPageGroups[1], posicionPaginaDos);
-                }
-
-                /*------------ Sección de Codigo Anterior ------------*/
-                /*------------ Dibujar filas ------------*/
-                /*
-                //Total de paginas del grupo
-                let totalPaginas = dataDeGrupo.pages.length;
-                
-                let ultimaPagina = totalPaginas - 1;
-                let penultimaPagina = totalPaginas - 2;
-
-                //Datos de cada pagina respectivamente
-                let dataUltimaPagina = dataDeGrupo.pages[ultimaPagina].columns;
-                let dataPenultimaPagina = dataDeGrupo.pages[penultimaPagina].columns;
-                
-                let dataTerritorios = [...dataPenultimaPagina, ...dataUltimaPagina];
-                console.log(dataTerritorios.length);
-                
-                // Dibujar encabezados
-                firstPage.drawText(`${adjustedYear}`, {x: 140, y:750, size: 12})
-                Object.entries(posicionPaginaUno.columns)
-                .slice(0, dataTerritorios.length)
-                .forEach(([_, value]) =>
-                    firstPage.drawText(value.name, value.params)
-                );
-                Object.entries(posicionPaginaDos.columns).forEach(([_, value]) =>
-                    secondPage.drawText(value.name, value.params)
-                );
-                
-                if (dataDeGrupo[0]?.name == 6) {
-                    penultimaPagina = ultimaPagina - 1;
-                    dataPenultimaPagina = dataDeGrupo.pages[penultimaPagina].columns;
-                }
-
-                let drawData = (page, data, initialX1, initialX2, initialY, initialY2) => {
-                    Object.entries(data).forEach(([_, value]) => {
-                      value.rows.forEach((item) => {
-                        page.drawText(item.name, { x: initialX1, y: initialY, size: 10 });
-                        page.drawText(item.startDate, { x: initialX1, y: initialY2, size: 9 });
-                        initialX1 += 106;
-                        page.drawText(item.endDate, { x: initialX2, y: initialY2, size: 9 });
-                        initialX2 += 106;
-                      });
-                      initialX1 = 140;
-                      initialX2 = 190;
-                      initialY -= 31;
-                      initialY2 -= 31;
-                    });
-                };
-
-                drawData(firstPage, dataTerritorios, 140, 190, 685, 670);
-                drawData(secondPage, dataUltimaPagina, 140, 190, 700, 685);
-                */
-
-                /*----------- FIN DE BLOQUE INICIAL DE DIBUJADO DE INFO PDF ----------------*/
-                
+                // 5. Guardar y generar URL Blob
                 const pdfBytes = await pdfDoc.save();
                 const blob = new Blob([pdfBytes], { type: "application/pdf" });
                 const url = URL.createObjectURL(blob);
                 setPdfUrl(url);
-                
+
             } catch (error) {
                 console.error("Error generando PDF:", error);
             } finally {
                 setLoading(false);
             }
         };
-        
-        fetchDataAndGeneratePDF();
-    }, [dataDeGrupo, nombreGrupo]);
+
+        generatePDF();
+    }, [folioRecords, nombreGrupo, totalTerritorios]);
 
     return (
         <>
             <NavbarApp />
-            <div className="p-4">
-                <h1 className="text-xl font-bold mb-2">Previsualizador PDF</h1>
-                <div className='flex w-full gap-2 items-center'>
-                    <Select variant='bordered' label="Territorio" onChange={(e) => setNombreGrupo(e.target.value)}>
-                        {Object.keys(territoriosState).map(
-                            (territorio) => <SelectItem key={territorio} value={territorio}>{territorio}</SelectItem>
-                        )}
-                    </Select>
-                </div>
+            <div className="p-4 max-w-5xl mx-auto pb-24">
+                <Card className="mb-4 shadow-sm">
+                    <CardBody>
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                                    📄 Formulario S-13-S (PDF)
+                                </h1>
+                                <p className="text-xs text-gray-500">
+                                    Registro de asignación de territorio oficial para la congregación.
+                                </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                                <div className="w-48">
+                                    <Select
+                                        variant='bordered'
+                                        size="sm"
+                                        label="Grupo"
+                                        selectedKeys={[nombreGrupo]}
+                                        onChange={(e) => setNombreGrupo(e.target.value)}
+                                    >
+                                        {Object.keys(territorios).map(
+                                            (territorio) => <SelectItem key={territorio} value={territorio}>{territorio}</SelectItem>
+                                        )}
+                                    </Select>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    color="secondary"
+                                    variant="flat"
+                                    onPress={() => navigate('/foliotable')}
+                                >
+                                    📊 Editar en Tabla
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    color="default"
+                                    variant="bordered"
+                                    onPress={() => navigate('/grupo')}
+                                >
+                                    🗺️ Ver Mapa
+                                </Button>
+                            </div>
+                        </div>
+                    </CardBody>
+                </Card>
+
                 {loading ? (
-                    <p>Cargando PDF...</p>
+                    <div className="flex justify-center my-12">
+                        <p className="text-sm text-gray-600">Generando documento PDF...</p>
+                    </div>
                 ) : pdfUrl ? (
-                    <>
+                    <Card className="shadow-md p-4">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-xs font-semibold text-gray-700">
+                                Vista Previa • Formulario S-13-S Grupo {nombreGrupo} ({adjustedYear})
+                            </span>
+                            <a
+                                href={pdfUrl}
+                                target="_blank"
+                                download={`S-13-S_${nombreGrupo}_${adjustedYear}.pdf`}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1"
+                            >
+                                ⬇️ Descargar PDF
+                            </a>
+                        </div>
+
                         {esMovil ? (
-                            <PDFCanvasViewer pdfUrl={pdfUrl}/>
+                            <PDFCanvasViewer pdfUrl={pdfUrl} />
                         ) : (
                             <iframe
                                 key={nombreGrupo}
                                 src={pdfUrl}
                                 width="100%"
-                                height="600px"
-                                style={{ border: "1px solid #ccc" }}
+                                height="650px"
+                                className="border rounded-lg"
                                 title="Vista previa del PDF"
                             />
                         )}
-                        <a
-                            href={pdfUrl}
-                            target="_blank"
-                            download={`${nombreGrupo}.pdf`}
-                            className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded"
-                        >
-                            Descargar PDF
-                        </a>
-                    </>
+                    </Card>
                 ) : (
-                    <p>No se pudo generar el PDF.</p>
+                    <p className="text-red-500">No se pudo generar el PDF.</p>
                 )}
             </div>
             <FooterNavbar />
         </>
     );
-}
+};
+
+export default PDFVisualizer;
