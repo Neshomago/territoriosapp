@@ -7,12 +7,12 @@ import { useAuth } from '../AuthProvider';
 const DatosGrupoContext = createContext();
 
 const DatosGrupoProvider = ({ children }) => {
-    const [ nombreGrupo, setNombreGrupo ] = useState('');
-    const [ dataDeGrupo, setDataDeGrupo ] = useState(null);
+    const [nombreGrupo, setNombreGrupo] = useState('');
+    const [dataDeGrupo, setDataDeGrupo] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const {user} = useAuth();
+    const { user } = useAuth();
 
     const getDataDeGrupo = async (nombreDeGrupo) => {
         if (!nombreDeGrupo) return;
@@ -23,8 +23,8 @@ const DatosGrupoProvider = ({ children }) => {
         try {
             const docRef = doc(db, 'folioAlboradaEste', nombreDeGrupo);
             const docSnap = await getDoc(docRef);
-            
-            if(!docSnap.exists()) {
+
+            if (!docSnap.exists()) {
                 console.log('No existe este grupo');
                 setDataDeGrupo(null);
                 return null;
@@ -35,13 +35,13 @@ const DatosGrupoProvider = ({ children }) => {
             };
         } catch (error) {
             setError("Error al obtener los datos del grupo");
-            console.error("Error fetching group data:", err);
+            console.error("Error fetching group data:", error);
         } finally {
             setLoading(false);
         }
     }
 
-    const saveRegistry = async(nombreDeGrupo, territorios) => {
+    const saveRegistry = async (nombreDeGrupo, territorios) => {
         if (!nombreDeGrupo) return;
         setLoading(true);
         setError(null);
@@ -53,14 +53,14 @@ const DatosGrupoProvider = ({ children }) => {
             const docSnap = await getDoc(docRef);
 
             // Inicializar el folio si no existe
-            let segundoObjeto = docSnap.exists() && docSnap.data() && Object.keys(docSnap.data()).length > 0 
-            ? docSnap.data() 
-            : {
-                name: nombreDeGrupo,
-                lastUpdatedDate: '',
-                completed: false,
-                pages: []
-            };
+            let segundoObjeto = docSnap.exists() && docSnap.data() && Object.keys(docSnap.data()).length > 0
+                ? docSnap.data()
+                : {
+                    name: nombreDeGrupo,
+                    lastUpdatedDate: '',
+                    completed: false,
+                    pages: []
+                };
 
             // Asegurar que las propiedades esenciales existan aunque el doc exista pero venga vacío o incompleto
             if (!segundoObjeto.pages) {
@@ -88,7 +88,7 @@ const DatosGrupoProvider = ({ children }) => {
                 const numeroDeTerritorios = Object.keys(territorios).length;
                 console.log(territorios);
                 console.log(numeroDeTerritorios);
-                
+
                 // Buscar o crear la página correspondiente
                 let pagina = segundoObjeto.pages.find(p => p.page === paginaDestino);
                 if (!pagina) {
@@ -128,7 +128,7 @@ const DatosGrupoProvider = ({ children }) => {
                         filaConStart = row;
                     }
                 });
-    
+
                 if (filaYaExiste) {
                     console.log(`⛔ Entrada duplicada encontrada para columna ${columnaNum}`);
                     continue;
@@ -147,7 +147,7 @@ const DatosGrupoProvider = ({ children }) => {
                         });
                         console.log(`✅ Nueva fila añadida en columna ${columnaNum}`);
                     }
-    
+
                     if (columna.rows.length === 25) {
                         columna.completed = true;
                         console.log(`🎉 Columna ${columnaNum} marcada como completa`);
@@ -169,12 +169,12 @@ const DatosGrupoProvider = ({ children }) => {
             console.error("❌ Error creating new registry:", err);
         } finally {
             setLoading(false);
-        }   
+        }
     }
 
     const createNewRegistry = async (nombreDeGrupo, territorios) => {
         if (!nombreDeGrupo) return;
-        
+
         // Descomentar para guardar folios vacios
         /* console.log(nombreDeGrupo);
         let grupo = '';
@@ -211,7 +211,7 @@ const DatosGrupoProvider = ({ children }) => {
         setError(null);
 
         const userObject = `${user.displayName[0]}. ${user.displayName.split(' ')[1]}`
-        
+
         try {
             // 1. Obtener los datos necesarios
             const segundoObjeto = await getDoc(doc(db, 'folioAlboradaEste', nombreDeGrupo)).then(docSnap => docSnap.data());
@@ -222,7 +222,7 @@ const DatosGrupoProvider = ({ children }) => {
                 const columnaCorrespondiente = parseInt(areaKey.replace('terr', ''));
                 let columnaEncontrada = null;
                 let paginaEncontrada = null;
-                
+
                 segundoObjeto.pages.forEach(folio => {
                     const columna = folio.columns.find(col => parseInt(col.name) === columnaCorrespondiente);
                     if (columna) {
@@ -233,15 +233,15 @@ const DatosGrupoProvider = ({ children }) => {
 
                 if (columnaEncontrada && !columnaEncontrada.completed) {
                     let rowDisponible = columnaEncontrada.rows;
-                    
+
                     if (!rowDisponible || rowDisponible.length < 25) {
                         rowDisponible.push({
                             startDate: area.fechaInicio,
                             endDate: area.fechaFin,
-                            name : userObject
+                            name: userObject
                         })
                     }
-                    
+
                     if (rowDisponible.length === 25) {
                         columnaEncontrada.completed = true;
                     }
@@ -277,7 +277,7 @@ const DatosGrupoProvider = ({ children }) => {
             console.error("Error creating new registry:", err);
         } finally {
             setLoading(false);
-        }   
+        }
     }
 
     return (
@@ -298,5 +298,5 @@ const DatosGrupoProvider = ({ children }) => {
 
 const useDatosGrupoContext = () => useContext(DatosGrupoContext);
 
-export { DatosGrupoProvider, useDatosGrupoContext};
+export { DatosGrupoProvider, useDatosGrupoContext };
 export default DatosGrupoContext;
