@@ -1,19 +1,19 @@
-import { 
-  Button, 
-  Card, 
-  CardBody, 
-  Progress, 
-  useDisclosure, 
-  Input, 
+import {
+  Button,
+  Card,
+  CardBody,
+  Progress,
+  useDisclosure,
+  Input,
   Chip,
-  Modal, 
-  ModalContent, 
-  ModalBody, 
+  Modal,
+  ModalContent,
+  ModalBody,
   ModalHeader,
-  Image, 
+  Image,
   Spinner,
-  Select, 
-  SelectItem 
+  Select,
+  SelectItem
 } from '@heroui/react';
 import { DatePicker } from "@heroui/date-picker";
 import { parseDate } from "@internationalized/date";
@@ -27,16 +27,16 @@ import { territorios } from './utils/_utils';
 
 export const GroupSelector = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { 
-    nombreGrupo, 
-    setNombreGrupo, 
-    territorioActivo, 
-    toggleManzanaStatus, 
-    updateTerritoryDetails, 
+  const {
+    nombreGrupo,
+    setNombreGrupo,
+    territorioActivo,
+    toggleManzanaStatus,
+    updateTerritoryDetails,
     archiveAndRestartSingleTerritory,
-    loading 
+    loading
   } = useDatosGrupoContext();
-  
+
   const [mapaTerritorio, setMapaTerritorio] = useState("");
   const { user } = useAuth();
   const [editButtonActive, setEditButtonActive] = useState({});
@@ -51,7 +51,9 @@ export const GroupSelector = () => {
   };
 
   const handleOpen = (terr) => {
-    setMapaTerritorio(terr);
+    setMapaTerritorio("")
+    const cleanUrl = terr.replace(/^https?:\/\/localhost:\d+(\/src\/components\/assets\/)?/, '');
+    setMapaTerritorio(cleanUrl);
     onOpen();
   };
 
@@ -158,9 +160,9 @@ export const GroupSelector = () => {
   return (
     <>
       <NavbarApp />
-      
+
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-nav-safe">
-        
+
         {/* Header & Group Control Card */}
         <section className="bg-white rounded-3xl p-5 sm:p-6 shadow-ambient border border-surface-container mb-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -178,10 +180,10 @@ export const GroupSelector = () => {
 
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <div className="w-full sm:w-60">
-                <Select 
+                <Select
                   variant="bordered"
                   size="sm"
-                  label="Grupo de Predicación" 
+                  label="Grupo de Predicación"
                   selectedKeys={[nombreGrupo]}
                   onChange={(e) => handleSetGrupo(e.target.value)}
                   classNames={{
@@ -195,7 +197,7 @@ export const GroupSelector = () => {
               </div>
 
               {territorioActivo?.mapa?.imagen && (
-                <Button 
+                <Button
                   size="sm"
                   variant="flat"
                   color="primary"
@@ -207,7 +209,7 @@ export const GroupSelector = () => {
                 </Button>
               )}
 
-              <Button 
+              <Button
                 size="sm"
                 variant="flat"
                 color="secondary"
@@ -245,13 +247,12 @@ export const GroupSelector = () => {
                 const completedCount = area.manzanas ? area.manzanas.filter(m => m.completed).length : 0;
 
                 return (
-                  <div 
+                  <div
                     key={areaKey}
-                    className={`bg-white rounded-3xl shadow-ambient border transition-all duration-300 overflow-hidden ${
-                      is100Percent 
-                        ? 'border-emerald-200 bg-emerald-50/20' 
-                        : 'border-surface-container'
-                    }`}
+                    className={`bg-white rounded-3xl shadow-ambient border transition-all duration-300 overflow-hidden ${is100Percent
+                      ? 'border-emerald-200 bg-emerald-50/20'
+                      : 'border-surface-container'
+                      }`}
                   >
                     <div className="p-5 sm:p-6">
                       {loadingAreas[areaKey] && (
@@ -266,20 +267,20 @@ export const GroupSelector = () => {
                           <h3 className="text-xl font-bold text-on-surface">
                             {area.name}
                           </h3>
-                          
+
                           {is100Percent ? (
-                            <Chip 
-                              size="sm" 
-                              variant="flat" 
+                            <Chip
+                              size="sm"
+                              variant="flat"
                               className="bg-emerald-100 text-emerald-800 font-semibold text-xs rounded-full border border-emerald-300"
                               startContent={<span className="material-symbols-outlined text-[16px] mr-0.5">check_circle</span>}
                             >
                               Completado 100%
                             </Chip>
                           ) : (
-                            <Chip 
-                              size="sm" 
-                              variant="flat" 
+                            <Chip
+                              size="sm"
+                              variant="flat"
                               className="bg-purple-100 text-primary font-semibold text-xs rounded-full font-mono"
                             >
                               {completedCount} / {totalManzanas} completadas
@@ -287,9 +288,9 @@ export const GroupSelector = () => {
                           )}
 
                           {area.user && (
-                            <Chip 
-                              size="sm" 
-                              variant="dot" 
+                            <Chip
+                              size="sm"
+                              variant="dot"
                               color="primary"
                               className="font-medium text-xs rounded-full"
                             >
@@ -301,9 +302,9 @@ export const GroupSelector = () => {
                         {/* Action buttons */}
                         <div className="flex items-center gap-2">
                           {(is100Percent || area.fechaFin) && !isEditing && (
-                            <Button 
-                              size="sm" 
-                              color="success" 
+                            <Button
+                              size="sm"
+                              color="success"
                               variant="solid"
                               onPress={() => handleSingleTerritoryArchiveAndRestart(areaKey, area)}
                               className="rounded-full text-xs font-bold text-white shadow-sm"
@@ -313,7 +314,7 @@ export const GroupSelector = () => {
                             </Button>
                           )}
 
-                          <Button 
+                          <Button
                             size="sm"
                             variant={isEditing ? "flat" : "light"}
                             color={isEditing ? "danger" : "primary"}
@@ -333,7 +334,7 @@ export const GroupSelector = () => {
                             <span className="material-symbols-outlined text-[16px]">edit_calendar</span>
                             Modificar publicador y fechas de este territorio:
                           </p>
-                          
+
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                             <div>
                               <Input
@@ -354,7 +355,7 @@ export const GroupSelector = () => {
                             </div>
 
                             <div>
-                              <DatePicker 
+                              <DatePicker
                                 size="sm"
                                 key={`fecha-inicio-${areaKey}`}
                                 label="Fecha de inicio"
@@ -365,7 +366,7 @@ export const GroupSelector = () => {
                                     ...prev,
                                     [areaKey]: { ...prev[areaKey], fechaInicio: fechaFormateada }
                                   }));
-                                }} 
+                                }}
                                 classNames={{
                                   calendarContent: "rounded-2xl",
                                 }}
@@ -373,7 +374,7 @@ export const GroupSelector = () => {
                             </div>
 
                             <div>
-                              <DatePicker 
+                              <DatePicker
                                 size="sm"
                                 key={`fecha-fin-${areaKey}`}
                                 label="Fecha completado"
@@ -384,7 +385,7 @@ export const GroupSelector = () => {
                                     ...prev,
                                     [areaKey]: { ...prev[areaKey], fechaFin: fechaFormateada }
                                   }));
-                                }} 
+                                }}
                                 classNames={{
                                   calendarContent: "rounded-2xl",
                                 }}
@@ -393,8 +394,8 @@ export const GroupSelector = () => {
                           </div>
 
                           <div className="flex justify-end gap-2 mt-3">
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               color="primary"
                               onPress={() => handlerGuardarEdicion(areaKey)}
                               className="rounded-full font-bold px-4"
@@ -410,12 +411,12 @@ export const GroupSelector = () => {
                       {!isEditing && (
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-on-surface-variant font-medium mb-3">
                           <span className="flex items-center gap-1">
-                            <strong className="text-on-surface">Iniciado:</strong> 
+                            <strong className="text-on-surface">Iniciado:</strong>
                             <span className="font-mono">{area.fechaInicio || "Por iniciar"}</span>
                           </span>
                           <span>•</span>
                           <span className="flex items-center gap-1">
-                            <strong className="text-on-surface">Finalizado:</strong> 
+                            <strong className="text-on-surface">Finalizado:</strong>
                             <span className="font-mono">{area.fechaFin || "En progreso"}</span>
                           </span>
                           {area.user && (
@@ -438,10 +439,9 @@ export const GroupSelector = () => {
                           </span>
                         </div>
                         <div className="h-2.5 w-full bg-surface-container rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-700 ${
-                              is100Percent ? 'bg-emerald-600' : 'bg-primary'
-                            }`} 
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${is100Percent ? 'bg-emerald-600' : 'bg-primary'
+                              }`}
                             style={{ width: `${progress}%` }}
                           />
                         </div>
@@ -463,11 +463,10 @@ export const GroupSelector = () => {
                                   e.preventDefault();
                                   handleCheckboxChange(areaKey, index);
                                 }}
-                                className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs font-mono font-bold transition-all duration-200 active-scale border ${
-                                  isChecked
-                                    ? 'bg-primary text-white border-primary shadow-sm hover:bg-primary-dark'
-                                    : 'bg-surface-container-low text-on-surface border-surface-container hover:bg-surface-container hover:border-surface-dim'
-                                }`}
+                                className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs font-mono font-bold transition-all duration-200 active-scale border ${isChecked
+                                  ? 'bg-primary text-white border-primary shadow-sm hover:bg-primary-dark'
+                                  : 'bg-surface-container-low text-on-surface border-surface-container hover:bg-surface-container hover:border-surface-dim'
+                                  }`}
                               >
                                 {isChecked && (
                                   <span className="material-symbols-outlined text-[14px] text-white">
@@ -490,10 +489,10 @@ export const GroupSelector = () => {
       </main>
 
       {/* Modal de Imagen del Mapa */}
-      <Modal 
-        placement="center" 
-        backdrop="blur" 
-        isOpen={isOpen} 
+      <Modal
+        placement="center"
+        backdrop="blur"
+        isOpen={isOpen}
         onClose={handleClose}
         classNames={{
           base: "rounded-3xl shadow-ambient-hover",
@@ -504,9 +503,9 @@ export const GroupSelector = () => {
             Mapa General del Territorio
           </ModalHeader>
           <ModalBody className="p-6">
-            <Image 
-              src={`assets/${mapaTerritorio}`} 
-              alt="Territorio" 
+            <Image
+              src={`assets/${mapaTerritorio}`}
+              alt="Territorio"
               className="w-full h-auto rounded-2xl shadow-md border border-surface-container"
             />
           </ModalBody>
