@@ -4,7 +4,7 @@ import { Select, SelectItem } from "@heroui/react";
 import { territorios } from './utils/_utils';
 
 import React, { useEffect, useState } from 'react'
-import { collection, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase'; // Importa la configuración de Firebase
 import NavbarApp from './NavbarApp';
 import FooterNavbar from './FooterNavbar';
