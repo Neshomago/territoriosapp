@@ -12,6 +12,8 @@ import { PrivateRoutes } from './components/PrivateRoutes.jsx';
 import { AuthProvider } from './components/AuthProvider.jsx';
 import { DatosGrupoProvider } from './components/contexts/grupoContext.jsx';
 import { GroupSelectorRenamer } from './components/GroupSelectorRenamer.jsx';
+import PredicacionEditor from './components/PredicacionEditor.jsx';
+import PredicacionView from './components/PredicacionView.jsx';
 
 function App() {
 
@@ -31,6 +33,8 @@ function App() {
                   <Route path='/pdfvisualizer' element={<PDFVisualizer/>}/>
                   <Route path='/pdfpageinfoedit' element={<PDFPageInfoEdit />} />
                   <Route path='/adminpanel' element={<AdminPanel/>}/>
+                  <Route path='/predicacion' element={<PredicacionView/>}/>
+                  <Route path='/predicacioneditor' element={<PredicacionEditor/>}/>
                   <Route path='*' element={<ErrorPage/>}/>
                 </Route>
                   <Route path='/login' element={<LoginPage/>}/>

@@ -101,13 +101,29 @@ const NavbarApp = () => {
                 >
                   Formulario PDF S-13-S
                 </DropdownItem>
-                <DropdownItem 
-                  key="admin" 
+                <DropdownItem
+                  key="admin"
                   startContent={<span className="material-symbols-outlined text-[20px] text-primary">admin_panel_settings</span>}
                   onPress={() => navigate('/adminpanel')}
                   className="rounded-xl my-0.5 font-medium"
                 >
                   Panel de Administración
+                </DropdownItem>
+                <DropdownItem
+                  key="predicacion"
+                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">calendar_month</span>}
+                  onPress={() => navigate('/predicacion')}
+                  className="rounded-xl my-0.5 font-medium"
+                >
+                  Arreglo de Predicación
+                </DropdownItem>
+                <DropdownItem
+                  key="predicacion-editor"
+                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">edit_calendar</span>}
+                  onPress={() => navigate('/predicacioneditor')}
+                  className="rounded-xl my-0.5 font-medium"
+                >
+                  Editar Predicación
                 </DropdownItem>
                 <DropdownItem 
                   key="logout" 
