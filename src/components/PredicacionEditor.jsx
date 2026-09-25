@@ -8,7 +8,7 @@ import {
   setDoc,
   where,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, COLLECTIONS, IS_TEST_MODE } from "./firebase";
 import NavbarApp from "./NavbarApp";
 import FooterNavbar from "./FooterNavbar";
 
@@ -96,12 +96,12 @@ export default function PredicacionEditor() {
 
   useEffect(() => {
     const weeklyQuery = query(
-      collection(db, "arregloPredicacion"),
+      collection(db, COLLECTIONS.ARREGLO_PREDICACION),
       where("tipo", "==", "semanal")
     );
 
     const monthlyQuery = query(
-      collection(db, "arregloPredicacion"),
+      collection(db, COLLECTIONS.ARREGLO_PREDICACION),
       where("tipo", "==", "mensual")
     );
 
@@ -140,15 +140,30 @@ export default function PredicacionEditor() {
     );
   };
 
-  const getSaturday = (dateString) => {
-    return (
-      monthly.find((item) => item.dia === dateString) || {
-        dia: dateString,
-        grupos: "",
-        lugar: "",
-        asignado: "",
-      }
-    );
+  // El primer y el último sábado del mes admiten 1 grupo; todos los
+  // sábados intermedios (sin importar cuántos haya) admiten hasta 2.
+  const getMaxEntries = (index, totalSaturdays) => {
+    const isFirst = index === 0;
+    const isLast = index === totalSaturdays - 1;
+    return isFirst || isLast ? 1 : 2;
+  };
+
+  const getSaturdayEntries = (dateString, entryCount) => {
+    return Array.from({ length: entryCount }, (_, i) => {
+      const orden = i + 1;
+
+      return (
+        monthly.find(
+          (item) => item.dia === dateString && item.orden === orden
+        ) || {
+          dia: dateString,
+          orden,
+          grupos: "",
+          lugar: "",
+          asignado: "",
+        }
+      );
+    });
   };
 
   const updateWeekly = async (dia, field, value) => {
@@ -162,7 +177,7 @@ export default function PredicacionEditor() {
       const current = getWeekly(dia);
 
       await setDoc(
-        doc(db, "arregloPredicacion", id),
+        doc(db, COLLECTIONS.ARREGLO_PREDICACION, id),
         {
           tipo: "semanal",
           dia,
@@ -193,21 +208,26 @@ export default function PredicacionEditor() {
 
   const updateSaturday = async (
     dateString,
+    orden,
     field,
     value
   ) => {
     try {
       setSaving(true);
 
-      const id = `mensual_${dateString}`;
+      const id = `mensual_${dateString}_${orden}`;
 
-      const current = getSaturday(dateString);
+      const current =
+        monthly.find(
+          (item) => item.dia === dateString && item.orden === orden
+        ) || { grupos: "", lugar: "", asignado: "" };
 
       await setDoc(
-        doc(db, "arregloPredicacion", id),
+        doc(db, COLLECTIONS.ARREGLO_PREDICACION, id),
         {
           tipo: "mensual",
           dia: dateString,
+          orden,
           grupos:
             field === "grupos"
               ? value
@@ -240,6 +260,22 @@ export default function PredicacionEditor() {
 
       const months = getThreeMonths();
 
+      // Limpieza: antes de generar, se borran los sábados de meses que ya
+      // pasaron (anteriores al 1ro del mes actual) para que la colección
+      // no crezca indefinidamente cada vez que se regenera.
+      const cutoffDateString = dateToString(months[0]);
+      const staleDocs = monthly.filter(
+        (item) => item.dia < cutoffDateString
+      );
+
+      await Promise.all(
+        staleDocs.map((item) =>
+          deleteDoc(
+            doc(db, COLLECTIONS.ARREGLO_PREDICACION, item.id)
+          )
+        )
+      );
+
       for (const month of months) {
         const saturdays = getSaturdays(
           month.getFullYear(),
@@ -265,26 +301,33 @@ export default function PredicacionEditor() {
             grupos = "Grupos 1, 2, 3 y 4";
           }
 
-          const id = `mensual_${dateString}`;
+          const entryCount = getMaxEntries(index, saturdays.length);
 
-          await setDoc(
-            doc(db, "arregloPredicacion", id),
-            {
-              tipo: "mensual",
-              dia: dateString,
-              grupos,
-              lugar: "",
-              asignado: "",
-            },
-            {
-              merge: true,
-            }
-          );
+          for (let orden = 1; orden <= entryCount; orden++) {
+            const id = `mensual_${dateString}_${orden}`;
+
+            await setDoc(
+              doc(db, COLLECTIONS.ARREGLO_PREDICACION, id),
+              {
+                tipo: "mensual",
+                dia: dateString,
+                orden,
+                grupos,
+                lugar: "",
+                asignado: "",
+              },
+              {
+                merge: true,
+              }
+            );
+          }
         }
       }
 
       setMessage(
-        "Se generaron los sábados de los próximos 3 meses."
+        staleDocs.length > 0
+          ? `Se generaron los sábados de los próximos 3 meses (y se limpiaron ${staleDocs.length} registros de meses ya pasados).`
+          : "Se generaron los sábados de los próximos 3 meses."
       );
     } catch (error) {
       console.error(error);
@@ -296,22 +339,57 @@ export default function PredicacionEditor() {
     }
   };
 
-  const deleteSaturday = async (dateString) => {
+  // Quita solo el segundo grupo de un sábado que tenía dos (queda con 1,
+  // igual que un sábado normal). Siempre se quita el orden más alto para
+  // no dejar huecos (nunca se borra el grupo 1 mientras exista el grupo 2).
+  const removeSecondEntry = async (dateString) => {
     try {
       setSaving(true);
 
       await deleteDoc(
         doc(
           db,
-          "arregloPredicacion",
-          `mensual_${dateString}`
+          COLLECTIONS.ARREGLO_PREDICACION,
+          `mensual_${dateString}_2`
         )
       );
 
-      setMessage("Registro eliminado.");
+      setMessage("Se quitó el segundo grupo de ese sábado.");
     } catch (error) {
       console.error(error);
-      setMessage("No se pudo eliminar.");
+      setMessage("No se pudo quitar el segundo grupo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Vuelve a agregar el segundo grupo a un sábado que se había dejado con 1
+  // (solo aplica a los sábados que admiten hasta 2: el 2do y el penúltimo).
+  const addSecondEntry = async (dateString) => {
+    try {
+      setSaving(true);
+
+      await setDoc(
+        doc(
+          db,
+          COLLECTIONS.ARREGLO_PREDICACION,
+          `mensual_${dateString}_2`
+        ),
+        {
+          tipo: "mensual",
+          dia: dateString,
+          orden: 2,
+          grupos: "",
+          lugar: "",
+          asignado: "",
+        },
+        { merge: true }
+      );
+
+      setMessage("Se agregó un segundo grupo para ese sábado.");
+    } catch (error) {
+      console.error(error);
+      setMessage("No se pudo agregar el segundo grupo.");
     } finally {
       setSaving(false);
     }
@@ -335,7 +413,9 @@ export default function PredicacionEditor() {
           </h1>
 
           <p className="mt-2 text-sm text-gray-500">
-            Los cambios se guardan directamente en Firebase.
+            {IS_TEST_MODE
+              ? `Los cambios se guardan en Firebase, colección de prueba (${COLLECTIONS.ARREGLO_PREDICACION}).`
+              : "Los cambios se guardan directamente en Firebase."}
           </p>
         </div>
 
@@ -488,12 +568,27 @@ export default function PredicacionEditor() {
                   {saturdays.map((date, index) => {
                     const dateString = dateToString(date);
 
-                    const item =
-                      getSaturday(dateString);
-
                     const isFirst = index === 0;
                     const isLast =
                       index === saturdays.length - 1;
+
+                    const maxEntries = getMaxEntries(
+                      index,
+                      saturdays.length
+                    );
+                    const savedCount = monthly.filter(
+                      (item) => item.dia === dateString
+                    ).length;
+                    // Si ya se generó/guardó algo para este sábado, se
+                    // respeta lo que realmente existe (para que borrar el
+                    // 2do grupo se quede así); si no, se usa el máximo por
+                    // defecto (1 o 2 según la posición del sábado).
+                    const entryCount =
+                      savedCount > 0 ? savedCount : maxEntries;
+                    const entries = getSaturdayEntries(
+                      dateString,
+                      entryCount
+                    );
 
                     return (
                       <div
@@ -514,109 +609,152 @@ export default function PredicacionEditor() {
                             </p>
                           </div>
 
-                          {(isFirst || isLast) && (
-                            <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700">
-                              {isFirst
-                                ? "Primer sábado"
-                                : "Último sábado"}
-                            </span>
-                          )}
+                          <div className="flex flex-wrap gap-2">
+                            {(isFirst || isLast) && (
+                              <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700">
+                                {isFirst
+                                  ? "Primer sábado"
+                                  : "Último sábado"}
+                              </span>
+                            )}
+
+                            {entryCount === 2 && (
+                              <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                2 registros
+                              </span>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-3">
-                          {/* GRUPOS */}
-
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-500">
-                              Grupos / actividad
-                            </label>
-
-                            <select
-                              value={item.grupos || ""}
-                              onChange={(e) =>
-                                updateSaturday(
-                                  dateString,
-                                  "grupos",
-                                  e.target.value
-                                )
+                        <div className="space-y-4">
+                          {entries.map((item, entryIdx) => (
+                            <div
+                              key={item.orden || entryIdx}
+                              className={
+                                entryCount === 2
+                                  ? "rounded-xl border border-gray-100 p-3"
+                                  : undefined
                               }
-                              className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
                             >
-                              <option value="">
-                                Seleccionar...
-                              </option>
+                              {entryCount === 2 &&
+                                entryIdx === 1 && (
+                                  <div className="mb-2 flex justify-end">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        removeSecondEntry(
+                                          dateString
+                                        )
+                                      }
+                                      className="text-xs font-medium text-red-500 hover:text-red-700"
+                                    >
+                                      Quitar segundo grupo
+                                    </button>
+                                  </div>
+                                )}
 
-                              {OPCIONES_GRUPOS.map(
-                                (option) => (
-                                  <option
-                                    key={option}
-                                    value={option}
+                              <div className="grid gap-4 md:grid-cols-3">
+                                {/* GRUPOS */}
+
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Grupos / actividad
+                                  </label>
+
+                                  <select
+                                    value={item.grupos || ""}
+                                    onChange={(e) =>
+                                      updateSaturday(
+                                        dateString,
+                                        item.orden || entryIdx + 1,
+                                        "grupos",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
                                   >
-                                    {option}
-                                  </option>
-                                )
-                              )}
-                            </select>
-                          </div>
+                                    <option value="">
+                                      Seleccionar...
+                                    </option>
 
-                          {/* LUGAR */}
+                                    {OPCIONES_GRUPOS.map(
+                                      (option) => (
+                                        <option
+                                          key={option}
+                                          value={option}
+                                        >
+                                          {option}
+                                        </option>
+                                      )
+                                    )}
+                                  </select>
+                                </div>
 
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-500">
-                              Lugar
-                            </label>
+                                {/* LUGAR */}
 
-                            <input
-                              type="text"
-                              value={item.lugar || ""}
-                              onChange={(e) =>
-                                updateSaturday(
-                                  dateString,
-                                  "lugar",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Lugar"
-                              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                            />
-                          </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Lugar
+                                  </label>
 
-                          {/* ASIGNADO */}
+                                  <input
+                                    type="text"
+                                    value={item.lugar || ""}
+                                    onChange={(e) =>
+                                      updateSaturday(
+                                        dateString,
+                                        item.orden || entryIdx + 1,
+                                        "lugar",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Lugar"
+                                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                                  />
+                                </div>
 
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-gray-500">
-                              Asignado
-                            </label>
+                                {/* ASIGNADO */}
 
-                            <input
-                              type="text"
-                              value={item.asignado || ""}
-                              onChange={(e) =>
-                                updateSaturday(
-                                  dateString,
-                                  "asignado",
-                                  e.target.value
-                                )
-                              }
-                              placeholder="Nombre"
-                              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                            />
-                          </div>
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-gray-500">
+                                    Asignado
+                                  </label>
+
+                                  <input
+                                    type="text"
+                                    value={item.asignado || ""}
+                                    onChange={(e) =>
+                                      updateSaturday(
+                                        dateString,
+                                        item.orden || entryIdx + 1,
+                                        "asignado",
+                                        e.target.value
+                                      )
+                                    }
+                                    placeholder="Nombre"
+                                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
 
-                        <div className="mt-4 flex justify-end">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              deleteSaturday(
-                                dateString
-                              )
-                            }
-                            className="text-xs font-medium text-red-500 hover:text-red-700"
-                          >
-                            Eliminar registro
-                          </button>
-                        </div>
+                        {entryCount < maxEntries && (
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                addSecondEntry(
+                                  dateString
+                                )
+                              }
+                              className="text-xs font-medium text-indigo-600 hover:text-indigo-800"
+                            >
+                              + Agregar otro grupo
+                            </button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

@@ -5,7 +5,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, COLLECTIONS } from "./firebase";
 import NavbarApp from "./NavbarApp";
 import FooterNavbar from "./FooterNavbar";
 
@@ -92,12 +92,12 @@ export default function PredicacionView() {
 
   useEffect(() => {
     const weeklyQuery = query(
-      collection(db, "arregloPredicacion"),
+      collection(db, COLLECTIONS.ARREGLO_PREDICACION),
       where("tipo", "==", "semanal")
     );
 
     const monthlyQuery = query(
-      collection(db, "arregloPredicacion"),
+      collection(db, COLLECTIONS.ARREGLO_PREDICACION),
       where("tipo", "==", "mensual")
     );
 
@@ -146,14 +146,36 @@ export default function PredicacionView() {
     return weekly.find((item) => item.dia === day);
   };
 
-  const getSaturdayData = (date) => {
+  // Debe coincidir con la misma regla de PredicacionEditor.jsx: el primer
+  // y el último sábado admiten 1 grupo, el resto admite hasta 2.
+  const getMaxEntries = (index, totalSaturdays) => {
+    const isFirst = index === 0;
+    const isLast = index === totalSaturdays - 1;
+    return isFirst || isLast ? 1 : 2;
+  };
+
+  const getSaturdayEntries = (date, index, totalSaturdays) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
 
     const dateString = `${year}-${month}-${day}`;
 
-    return monthly.find((item) => item.dia === dateString);
+    const savedCount = monthly.filter(
+      (item) => item.dia === dateString
+    ).length;
+    const entryCount =
+      savedCount > 0
+        ? savedCount
+        : getMaxEntries(index, totalSaturdays);
+
+    return Array.from({ length: entryCount }, (_, i) => {
+      const orden = i + 1;
+
+      return monthly.find(
+        (item) => item.dia === dateString && item.orden === orden
+      );
+    });
   };
 
   if (loading) {
@@ -342,7 +364,11 @@ export default function PredicacionView() {
 
                     const dateString = `${year}-${monthNumber}-${dayNumber}`;
 
-                    const item = getSaturdayData(date);
+                    const entries = getSaturdayEntries(
+                      date,
+                      index,
+                      saturdays.length
+                    );
 
                     const formatted = formatDate(dateString);
 
@@ -364,34 +390,42 @@ export default function PredicacionView() {
                           </div>
 
                           {/* Content */}
-                          <div className="flex-1 p-4 sm:p-5">
-                            <div className="mb-2">
-                              <span className="inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700">
-                                {item?.grupos || "Sin asignar"}
-                              </span>
-                            </div>
+                          <div className="flex-1 divide-y divide-gray-100">
+                            {entries.map((item, entryIdx) => (
+                              <div
+                                key={item?.orden || entryIdx}
+                                className="p-4 sm:p-5"
+                              >
 
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div>
-                                <p className="text-xs text-gray-400">
-                                  Lugar
-                                </p>
+                                <div className="mb-2">
+                                  <span className="inline-flex rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-700">
+                                    {item?.grupos || "Sin asignar"}
+                                  </span>
+                                </div>
 
-                                <p className="mt-1 font-medium text-gray-800">
-                                  {item?.lugar || "—"}
-                                </p>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <div>
+                                    <p className="text-xs text-gray-400">
+                                      Lugar
+                                    </p>
+
+                                    <p className="mt-1 font-medium text-gray-800">
+                                      {item?.lugar || "—"}
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <p className="text-xs text-gray-400">
+                                      Asignado
+                                    </p>
+
+                                    <p className="mt-1 font-medium text-gray-800">
+                                      {item?.asignado || "—"}
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
-
-                              <div>
-                                <p className="text-xs text-gray-400">
-                                  Asignado
-                                </p>
-
-                                <p className="mt-1 font-medium text-gray-800">
-                                  {item?.asignado || "—"}
-                                </p>
-                              </div>
-                            </div>
+                            ))}
                           </div>
                         </div>
                       </div>
