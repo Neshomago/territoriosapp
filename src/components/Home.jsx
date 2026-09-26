@@ -21,13 +21,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 import NavbarApp from './NavbarApp';
 import FooterNavbar from './FooterNavbar';
+import TerritorioDelDiaCard from './TerritorioDelDiaCard';
 import { useDatosGrupoContext } from './contexts/grupoContext';
+import { roleAtLeast } from './utils/userAccess';
 
 export const Home = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { nombreGrupo, folioRecords, territorioActivo } = useDatosGrupoContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const isAdmin = roleAtLeast(profile, 'admin');
 
   const handleGrupos = () => {
     navigate('/grupo');
@@ -76,6 +79,8 @@ export const Home = () => {
       <NavbarApp />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-nav-safe">
+
+        <TerritorioDelDiaCard />
 
         {/* Search & Filter Bar */}
         {/* <section className="mb-8">
@@ -168,7 +173,8 @@ export const Home = () => {
           </div>
         </section> */}
 
-        {/* Bento Active Territories Section */}
+        {/* Bento Active Territories Section (solo admin+: territorios/folio/pdf) */}
+        {isAdmin && (
         <section className="mb-12">
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -374,6 +380,7 @@ export const Home = () => {
 
           </div>
         </section>
+        )}
 
         {/* Section: Casas No Predicar / No Visitar */}
         <section className="mb-12">
