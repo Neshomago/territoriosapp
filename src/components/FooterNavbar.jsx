@@ -1,9 +1,13 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from './AuthProvider';
+import { roleAtLeast } from './utils/userAccess';
 
 const FooterNavbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile } = useAuth();
+  const isAdmin = roleAtLeast(profile, 'admin');
 
   const navItems = [
     {
@@ -13,28 +17,28 @@ const FooterNavbar = () => {
       path: '/home',
       isActive: location.pathname === '/' || location.pathname === '/home',
     },
-    {
+    isAdmin && {
       id: 'grupo',
       label: 'Territorios',
       icon: 'map',
       path: '/grupo',
       isActive: location.pathname === '/grupo',
     },
-    {
+    isAdmin && {
       id: 'folio',
       label: 'Folio S-13-S',
       icon: 'table_chart',
       path: '/foliotable',
       isActive: location.pathname === '/foliotable',
     },
-    {
+    isAdmin && {
       id: 'pdf',
       label: 'PDF',
       icon: 'picture_as_pdf',
       path: '/pdfvisualizer',
       isActive: location.pathname === '/pdfvisualizer',
     },
-  ];
+  ].filter(Boolean);
 
   return (
     <div className="fixed bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
