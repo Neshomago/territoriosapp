@@ -17,13 +17,16 @@ import {
 } from '@heroui/react';
 import { DatePicker } from "@heroui/date-picker";
 import { parseDate } from "@internationalized/date";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import NavbarApp from './NavbarApp';
 import FooterNavbar from './FooterNavbar';
 import { useAuth } from './AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import { useDatosGrupoContext } from './contexts/grupoContext';
 import { territorios } from './utils/_utils';
+import { db, COLLECTIONS } from './firebase';
+import ImagePreviewModal from './ImagePreviewModal';
 
 export const GroupSelector = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -42,6 +45,35 @@ export const GroupSelector = () => {
   const [editButtonActive, setEditButtonActive] = useState({});
   const [editedTerritoryData, setEditedTerritoryData] = useState({});
   const [loadingAreas, setLoadingAreas] = useState({});
+  const [casasNoVisitar, setCasasNoVisitar] = useState([]);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // Indicador de solo lectura: casas no visitar vinculadas a este grupo,
+  // para marcar la manzana correspondiente en la cuadrícula de abajo.
+  useEffect(() => {
+    if (!nombreGrupo) {
+      setCasasNoVisitar([]);
+      return undefined;
+    }
+
+    const q = query(
+      collection(db, COLLECTIONS.CASAS_NO_VISITAR),
+      where('grupo', '==', nombreGrupo)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCasasNoVisitar(
+        snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+      );
+    });
+
+    return () => unsubscribe();
+  }, [nombreGrupo]);
+
+  const getCasaNoVisitar = (areaKey, manzanaName) =>
+    casasNoVisitar.find(
+      (casa) => casa.territorioKey === areaKey && casa.manzanaName === manzanaName
+    );
 
   const navigateTo = useNavigate();
   const defaultUserName = user?.displayName ? `${user.displayName[0]}. ${user.displayName.split(' ')[1] || ''}` : '';
@@ -455,26 +487,47 @@ export const GroupSelector = () => {
                         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
                           {area.manzanas && area.manzanas.map((item, index) => {
                             const isChecked = Boolean(item.completed);
+                            const casaNoVisitar = getCasaNoVisitar(areaKey, item.name);
                             return (
-                              <button
-                                key={index}
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleCheckboxChange(areaKey, index);
-                                }}
-                                className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs font-mono font-bold transition-all duration-200 active-scale border ${isChecked
-                                  ? 'bg-primary text-white border-primary shadow-sm hover:bg-primary-dark'
-                                  : 'bg-surface-container-low text-on-surface border-surface-container hover:bg-surface-container hover:border-surface-dim'
-                                  }`}
-                              >
-                                {isChecked && (
-                                  <span className="material-symbols-outlined text-[14px] text-white">
-                                    check
-                                  </span>
+                              <div key={index} className="relative">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleCheckboxChange(areaKey, index);
+                                  }}
+                                  className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs font-mono font-bold transition-all duration-200 active-scale border ${isChecked
+                                    ? 'bg-primary text-white border-primary shadow-sm hover:bg-primary-dark'
+                                    : 'bg-surface-container-low text-on-surface border-surface-container hover:bg-surface-container hover:border-surface-dim'
+                                    }`}
+                                >
+                                  {isChecked && (
+                                    <span className="material-symbols-outlined text-[14px] text-white">
+                                      check
+                                    </span>
+                                  )}
+                                  <span>{item.name}</span>
+                                </button>
+
+                                {casaNoVisitar && (
+                                  <button
+                                    type="button"
+                                    title={`No visitar - Villa ${casaNoVisitar.villa || '?'}: ${casaNoVisitar.ref || 'Sin motivo'}`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (casaNoVisitar.imagenUrl) {
+                                        setPreviewImage(casaNoVisitar.imagenUrl);
+                                      }
+                                    }}
+                                    className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white shadow-sm ring-2 ring-white"
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">
+                                      block
+                                    </span>
+                                  </button>
                                 )}
-                                <span>{item.name}</span>
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
@@ -511,6 +564,11 @@ export const GroupSelector = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      <ImagePreviewModal
+        imageUrl={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
 
       <FooterNavbar />
     </>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   deleteDoc,
@@ -90,9 +90,80 @@ function getThreeMonths() {
 export default function PredicacionEditor() {
   const [weekly, setWeekly] = useState([]);
   const [monthly, setMonthly] = useState([]);
+  const [lugares, setLugares] = useState([]);
+  const [nuevoLugarNombre, setNuevoLugarNombre] = useState("");
+  const [nuevoLugarUrl, setNuevoLugarUrl] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Escritura diferida: mientras se escribe en Horario/Asignado, el valor
+  // se guarda localmente y solo se envía a Firestore ~600ms después de la
+  // última tecla (o de inmediato si el campo pierde foco o la pestaña se
+  // oculta), en vez de un guardado por cada tecla.
+  const DEBOUNCE_MS = 600;
+  const [fieldDrafts, setFieldDrafts] = useState({});
+  const pendingCommitsRef = useRef({});
+
+  const getDraftValue = (key, fallback) =>
+    key in fieldDrafts ? fieldDrafts[key] : fallback;
+
+  const runCommit = (key) => {
+    const pending = pendingCommitsRef.current[key];
+    if (!pending) return;
+
+    delete pendingCommitsRef.current[key];
+
+    pending.commit().finally(() => {
+      setFieldDrafts((prev) => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    });
+  };
+
+  const scheduleFieldChange = (key, value, commit) => {
+    setFieldDrafts((prev) => ({ ...prev, [key]: value }));
+
+    if (pendingCommitsRef.current[key]) {
+      clearTimeout(pendingCommitsRef.current[key].timer);
+    }
+
+    const timer = setTimeout(() => runCommit(key), DEBOUNCE_MS);
+    pendingCommitsRef.current[key] = { timer, commit };
+  };
+
+  const flushField = (key) => {
+    if (pendingCommitsRef.current[key]) {
+      clearTimeout(pendingCommitsRef.current[key].timer);
+    }
+    runCommit(key);
+  };
+
+  // Si se cambia de pestaña/app o se cierra la página con algo pendiente
+  // de guardar, se envía de inmediato en vez de esperar el debounce.
+  useEffect(() => {
+    const flushAllPending = () => {
+      Object.keys(pendingCommitsRef.current).forEach((key) => {
+        clearTimeout(pendingCommitsRef.current[key].timer);
+        runCommit(key);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) flushAllPending();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", flushAllPending);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushAllPending);
+    };
+  }, []);
 
   useEffect(() => {
     const weeklyQuery = query(
@@ -123,9 +194,22 @@ export default function PredicacionEditor() {
       );
     });
 
+    const unsubscribeLugares = onSnapshot(
+      collection(db, COLLECTIONS.LUGARES_PREDICACION),
+      (snapshot) => {
+        setLugares(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
+      }
+    );
+
     return () => {
       unsubscribeWeekly();
       unsubscribeMonthly();
+      unsubscribeLugares();
     };
   }, []);
 
@@ -134,10 +218,45 @@ export default function PredicacionEditor() {
       weekly.find((item) => item.dia === dia) || {
         dia,
         horario: "",
-        lugar: "",
+        lugarId: "",
         asignado: "",
       }
     );
+  };
+
+  const addLugar = async () => {
+    if (!nuevoLugarNombre.trim() || !nuevoLugarUrl.trim()) return;
+
+    try {
+      const newDocRef = doc(
+        collection(db, COLLECTIONS.LUGARES_PREDICACION)
+      );
+
+      await setDoc(newDocRef, {
+        nombre: nuevoLugarNombre.trim(),
+        mapsUrl: nuevoLugarUrl.trim(),
+        createdAt: new Date(),
+      });
+
+      setNuevoLugarNombre("");
+      setNuevoLugarUrl("");
+      setMessage("Lugar agregado.");
+    } catch (error) {
+      console.error(error);
+      setMessage("No se pudo agregar el lugar.");
+    }
+  };
+
+  const deleteLugar = async (lugarId) => {
+    try {
+      await deleteDoc(
+        doc(db, COLLECTIONS.LUGARES_PREDICACION, lugarId)
+      );
+      setMessage("Lugar eliminado.");
+    } catch (error) {
+      console.error(error);
+      setMessage("No se pudo eliminar el lugar.");
+    }
   };
 
   // El primer y el último sábado del mes admiten 1 grupo; todos los
@@ -159,7 +278,7 @@ export default function PredicacionEditor() {
           dia: dateString,
           orden,
           grupos: "",
-          lugar: "",
+          lugarId: "",
           asignado: "",
         }
       );
@@ -185,10 +304,10 @@ export default function PredicacionEditor() {
             field === "horario"
               ? value
               : current.horario,
-          lugar:
-            field === "lugar"
+          lugarId:
+            field === "lugarId"
               ? value
-              : current.lugar,
+              : current.lugarId,
           asignado:
             field === "asignado"
               ? value
@@ -220,7 +339,7 @@ export default function PredicacionEditor() {
       const current =
         monthly.find(
           (item) => item.dia === dateString && item.orden === orden
-        ) || { grupos: "", lugar: "", asignado: "" };
+        ) || { grupos: "", lugarId: "", asignado: "" };
 
       await setDoc(
         doc(db, COLLECTIONS.ARREGLO_PREDICACION, id),
@@ -232,10 +351,10 @@ export default function PredicacionEditor() {
             field === "grupos"
               ? value
               : current.grupos,
-          lugar:
-            field === "lugar"
+          lugarId:
+            field === "lugarId"
               ? value
-              : current.lugar,
+              : current.lugarId,
           asignado:
             field === "asignado"
               ? value
@@ -313,7 +432,7 @@ export default function PredicacionEditor() {
                 dia: dateString,
                 orden,
                 grupos,
-                lugar: "",
+                lugarId: "",
                 asignado: "",
               },
               {
@@ -380,7 +499,7 @@ export default function PredicacionEditor() {
           dia: dateString,
           orden: 2,
           grupos: "",
-          lugar: "",
+          lugarId: "",
           asignado: "",
         },
         { merge: true }
@@ -438,6 +557,99 @@ export default function PredicacionEditor() {
       )}
 
       {/* =========================================
+          LUGARES DE PREDICACIÓN
+      ========================================= */}
+
+      <div className="mb-10">
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-gray-900">
+            Lugares de predicación
+          </h2>
+
+          <p className="text-sm text-gray-500">
+            Estos lugares aparecen como opción en el campo &ldquo;Lugar&rdquo;
+            de abajo, con un enlace a Google Maps.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-3 mb-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500">
+                Nombre
+              </label>
+              <input
+                type="text"
+                value={nuevoLugarNombre}
+                onChange={(e) => setNuevoLugarNombre(e.target.value)}
+                placeholder="Ej. Parque Central"
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-500">
+                URL de Google Maps
+              </label>
+              <input
+                type="text"
+                value={nuevoLugarUrl}
+                onChange={(e) => setNuevoLugarUrl(e.target.value)}
+                placeholder="https://maps.google.com/..."
+                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={addLugar}
+                className="w-full rounded-xl bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700"
+              >
+                Agregar lugar
+              </button>
+            </div>
+          </div>
+
+          {lugares.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              Todavía no hay lugares registrados.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {lugares.map((lugar) => (
+                <div
+                  key={lugar.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 px-3 py-2"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {lugar.nombre}
+                    </p>
+                    <a
+                      href={lugar.mapsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-purple-600 hover:underline"
+                    >
+                      {lugar.mapsUrl}
+                    </a>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteLugar(lugar.id)}
+                    className="text-xs font-medium text-red-500 hover:text-red-700"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* =========================================
           SEMANA
       ========================================= */}
 
@@ -473,13 +685,19 @@ export default function PredicacionEditor() {
 
                     <input
                       type="text"
-                      value={item.horario || ""}
+                      value={getDraftValue(
+                        `semanal:${dia}:horario`,
+                        item.horario || ""
+                      )}
                       onChange={(e) =>
-                        updateWeekly(
-                          dia,
-                          "horario",
-                          e.target.value
+                        scheduleFieldChange(
+                          `semanal:${dia}:horario`,
+                          e.target.value,
+                          () => updateWeekly(dia, "horario", e.target.value)
                         )
+                      }
+                      onBlur={() =>
+                        flushField(`semanal:${dia}:horario`)
                       }
                       placeholder="Ej. 8:30"
                       className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
@@ -491,19 +709,24 @@ export default function PredicacionEditor() {
                       Lugar
                     </label>
 
-                    <input
-                      type="text"
-                      value={item.lugar || ""}
+                    <select
+                      value={item.lugarId || ""}
                       onChange={(e) =>
                         updateWeekly(
                           dia,
-                          "lugar",
+                          "lugarId",
                           e.target.value
                         )
                       }
-                      placeholder="Lugar"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                    />
+                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                    >
+                      <option value="">Sin lugar</option>
+                      {lugares.map((lugar) => (
+                        <option key={lugar.id} value={lugar.id}>
+                          {lugar.nombre}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
@@ -513,13 +736,19 @@ export default function PredicacionEditor() {
 
                     <input
                       type="text"
-                      value={item.asignado || ""}
+                      value={getDraftValue(
+                        `semanal:${dia}:asignado`,
+                        item.asignado || ""
+                      )}
                       onChange={(e) =>
-                        updateWeekly(
-                          dia,
-                          "asignado",
-                          e.target.value
+                        scheduleFieldChange(
+                          `semanal:${dia}:asignado`,
+                          e.target.value,
+                          () => updateWeekly(dia, "asignado", e.target.value)
                         )
+                      }
+                      onBlur={() =>
+                        flushField(`semanal:${dia}:asignado`)
                       }
                       placeholder="Nombre"
                       className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
@@ -697,20 +926,25 @@ export default function PredicacionEditor() {
                                     Lugar
                                   </label>
 
-                                  <input
-                                    type="text"
-                                    value={item.lugar || ""}
+                                  <select
+                                    value={item.lugarId || ""}
                                     onChange={(e) =>
                                       updateSaturday(
                                         dateString,
                                         item.orden || entryIdx + 1,
-                                        "lugar",
+                                        "lugarId",
                                         e.target.value
                                       )
                                     }
-                                    placeholder="Lugar"
-                                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
-                                  />
+                                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                                  >
+                                    <option value="">Sin lugar</option>
+                                    {lugares.map((lugar) => (
+                                      <option key={lugar.id} value={lugar.id}>
+                                        {lugar.nombre}
+                                      </option>
+                                    ))}
+                                  </select>
                                 </div>
 
                                 {/* ASIGNADO */}
@@ -722,13 +956,27 @@ export default function PredicacionEditor() {
 
                                   <input
                                     type="text"
-                                    value={item.asignado || ""}
-                                    onChange={(e) =>
-                                      updateSaturday(
-                                        dateString,
-                                        item.orden || entryIdx + 1,
-                                        "asignado",
-                                        e.target.value
+                                    value={getDraftValue(
+                                      `mensual:${dateString}:${item.orden || entryIdx + 1}:asignado`,
+                                      item.asignado || ""
+                                    )}
+                                    onChange={(e) => {
+                                      const orden = item.orden || entryIdx + 1;
+                                      scheduleFieldChange(
+                                        `mensual:${dateString}:${orden}:asignado`,
+                                        e.target.value,
+                                        () =>
+                                          updateSaturday(
+                                            dateString,
+                                            orden,
+                                            "asignado",
+                                            e.target.value
+                                          )
+                                      );
+                                    }}
+                                    onBlur={() =>
+                                      flushField(
+                                        `mensual:${dateString}:${item.orden || entryIdx + 1}:asignado`
                                       )
                                     }
                                     placeholder="Nombre"

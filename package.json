@@ -12,6 +12,7 @@
   "dependencies": {
     "@heroui/react": "^2.6.14",
     "@internationalized/date": "^3.8.2",
+    "browser-image-compression": "^2.0.2",
     "firebase": "^10.12.5",
     "framer-motion": "^11.3.18",
     "pdf-lib": "^1.17.1",

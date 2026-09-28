@@ -4,17 +4,29 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
 
 //style={{backgroundImage:`url("https://cms-imgp.jw-cdn.org/img/p/502016230/univ/art/502016230_univ_lsr_xl.jpg")`}}
+const TEST_ROLES = [
+    { role: 'user', label: 'Usuario' },
+    { role: 'admin', label: 'Admin' },
+    { role: 'manager', label: 'Gerente' },
+    { role: 'superuser', label: 'Superusuario' },
+];
+
 const LoginPage = () => {
-    const { loginWithGoogle, loginWithOutlook } = useAuth();
+    const { loginWithGoogle, loginWithOutlook, loginAsTestUser } = useAuth();
      const navigate = useNavigate();
 
     const handleLogin = async () => {
         await loginWithGoogle();
         navigate('/home');
     };
-    
+
     const handleMsLogin = async () => {
         await loginWithOutlook();
+        navigate('/home');
+    };
+
+    const handleTestLogin = async (role) => {
+        await loginAsTestUser(role);
         navigate('/home');
     };
 
@@ -45,16 +57,30 @@ const LoginPage = () => {
             <img className="mr-2 ml-1 w-5 h-5" src="https://img.icons8.com/ios-filled/50/ms-outlook.png" alt="ms-outlook"/>
                 Login con Hotmail / Outlook
             </Button>
-            <div className=''>
-                <Button className='w-30 scale-85' color='primary' variant='flat' >
-                    <span className="material-symbols-outlined"> mail </span>
-                    Login con email
-                </Button>
-                <Button className='w-30 scale-85 text-slate-400' variant='ghost'>
-                    <span className="material-symbols-outlined"> person_add </span>
-                    Nuevo Usuario
-                </Button>
-            </div>
+            <p className='text-xs text-slate-400 text-center w-full mt-1'>
+                Si es tu primer inicio de sesión, tu cuenta quedará pendiente de aprobación por un administrador.
+            </p>
+
+            {import.meta.env.DEV && (
+                <div className='w-full mt-4 pt-3 border-t border-dashed border-slate-300 flex flex-col items-center gap-2'>
+                    <p className='text-xs font-semibold text-slate-400 uppercase tracking-wide'>
+                        Modo de prueba (solo en desarrollo)
+                    </p>
+                    <div className='flex flex-wrap justify-center gap-2'>
+                        {TEST_ROLES.map(({ role, label }) => (
+                            <Button
+                                key={role}
+                                size='sm'
+                                variant='flat'
+                                color='secondary'
+                                onPress={() => handleTestLogin(role)}
+                            >
+                                {label}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     </div>
   )

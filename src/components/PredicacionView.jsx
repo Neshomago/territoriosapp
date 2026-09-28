@@ -88,6 +88,7 @@ function getThreeMonths() {
 export default function PredicacionView() {
   const [weekly, setWeekly] = useState([]);
   const [monthly, setMonthly] = useState([]);
+  const [lugares, setLugares] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -134,9 +135,22 @@ export default function PredicacionView() {
       }
     );
 
+    const unsubscribeLugares = onSnapshot(
+      collection(db, COLLECTIONS.LUGARES_PREDICACION),
+      (snapshot) => {
+        setLugares(
+          snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
+      }
+    );
+
     return () => {
       unsubscribeWeekly();
       unsubscribeMonthly();
+      unsubscribeLugares();
     };
   }, []);
 
@@ -144,6 +158,27 @@ export default function PredicacionView() {
 
   const getWeeklyDay = (day) => {
     return weekly.find((item) => item.dia === day);
+  };
+
+  const getLugar = (lugarId) => {
+    return lugares.find((lugar) => lugar.id === lugarId);
+  };
+
+  const renderLugar = (lugarId) => {
+    const lugar = getLugar(lugarId);
+
+    if (!lugar) return "—";
+
+    return (
+      <a
+        href={lugar.mapsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="underline hover:text-purple-600"
+      >
+        {lugar.nombre}
+      </a>
+    );
   };
 
   // Debe coincidir con la misma regla de PredicacionEditor.jsx: el primer
@@ -257,7 +292,7 @@ export default function PredicacionView() {
                 </div>
 
                 <div className="px-5 py-4 text-gray-600">
-                  {item?.lugar || "—"}
+                  {renderLugar(item?.lugarId)}
                 </div>
 
                 <div className="px-5 py-4 font-medium text-gray-800">
@@ -295,7 +330,7 @@ export default function PredicacionView() {
                     </p>
 
                     <p className="mt-1 font-medium text-gray-700">
-                      {item?.lugar || "—"}
+                      {renderLugar(item?.lugarId)}
                     </p>
                   </div>
 
@@ -410,7 +445,7 @@ export default function PredicacionView() {
                                     </p>
 
                                     <p className="mt-1 font-medium text-gray-800">
-                                      {item?.lugar || "—"}
+                                      {renderLugar(item?.lugarId)}
                                     </p>
                                   </div>
 

@@ -11,11 +11,15 @@ import {
 } from "@heroui/react";
 import { useAuth } from './AuthProvider';
 import { useDatosGrupoContext } from './contexts/grupoContext';
+import { roleAtLeast } from './utils/userAccess';
 
 const NavbarApp = () => {
-  const { logout, user } = useAuth();
+  const { logout, user, profile, role, isTestSession } = useAuth();
   const { isOnline, isSyncing, isTestMode } = useDatosGrupoContext();
   const navigate = useNavigate();
+
+  const isAdmin = roleAtLeast(profile, 'admin');
+  const isManager = roleAtLeast(profile, 'manager');
 
   const handleLogout = async () => {
     await logout();
@@ -77,38 +81,46 @@ const NavbarApp = () => {
                 >
                   Dashboard Principal
                 </DropdownItem>
-                <DropdownItem 
-                  key="map" 
-                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">map</span>}
-                  onPress={() => navigate('/grupo')}
-                  className="rounded-xl my-0.5 font-medium"
-                >
-                  Territorios y Manzanas
-                </DropdownItem>
-                <DropdownItem 
-                  key="folio" 
-                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">table_chart</span>}
-                  onPress={() => navigate('/foliotable')}
-                  className="rounded-xl my-0.5 font-medium"
-                >
-                  Tabla de Folio (S-13-S)
-                </DropdownItem>
-                <DropdownItem 
-                  key="pdf" 
-                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">picture_as_pdf</span>}
-                  onPress={() => navigate('/pdfvisualizer')}
-                  className="rounded-xl my-0.5 font-medium"
-                >
-                  Formulario PDF S-13-S
-                </DropdownItem>
-                <DropdownItem
-                  key="admin"
-                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">admin_panel_settings</span>}
-                  onPress={() => navigate('/adminpanel')}
-                  className="rounded-xl my-0.5 font-medium"
-                >
-                  Panel de Administración
-                </DropdownItem>
+                {isAdmin && (
+                  <DropdownItem
+                    key="map"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">map</span>}
+                    onPress={() => navigate('/grupo')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Territorios y Manzanas
+                  </DropdownItem>
+                )}
+                {isAdmin && (
+                  <DropdownItem
+                    key="folio"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">table_chart</span>}
+                    onPress={() => navigate('/foliotable')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Tabla de Folio (S-13-S)
+                  </DropdownItem>
+                )}
+                {isAdmin && (
+                  <DropdownItem
+                    key="pdf"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">picture_as_pdf</span>}
+                    onPress={() => navigate('/pdfvisualizer')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Formulario PDF S-13-S
+                  </DropdownItem>
+                )}
+                {isManager && (
+                  <DropdownItem
+                    key="admin"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">admin_panel_settings</span>}
+                    onPress={() => navigate('/adminpanel')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Panel de Administración
+                  </DropdownItem>
+                )}
                 <DropdownItem
                   key="predicacion"
                   startContent={<span className="material-symbols-outlined text-[20px] text-primary">calendar_month</span>}
@@ -117,16 +129,28 @@ const NavbarApp = () => {
                 >
                   Arreglo de Predicación
                 </DropdownItem>
+                {isAdmin && (
+                  <DropdownItem
+                    key="predicacion-editor"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">edit_calendar</span>}
+                    onPress={() => navigate('/predicacioneditor')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Editar Predicación
+                  </DropdownItem>
+                )}
+                {isAdmin && (
+                  <DropdownItem
+                    key="casas-no-visitar"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">block</span>}
+                    onPress={() => navigate('/casasnovisitar')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Casas No Visitar
+                  </DropdownItem>
+                )}
                 <DropdownItem
-                  key="predicacion-editor"
-                  startContent={<span className="material-symbols-outlined text-[20px] text-primary">edit_calendar</span>}
-                  onPress={() => navigate('/predicacioneditor')}
-                  className="rounded-xl my-0.5 font-medium"
-                >
-                  Editar Predicación
-                </DropdownItem>
-                <DropdownItem 
-                  key="logout" 
+                  key="logout"
                   color="danger" 
                   className="text-danger rounded-xl mt-1 border-t border-surface-container pt-2 font-semibold"
                   startContent={<span className="material-symbols-outlined text-[20px]">logout</span>}
@@ -151,12 +175,25 @@ const NavbarApp = () => {
           {/* Indicador de Modo Pruebas */}
           {isTestMode && (
             <Tooltip content="Trabajando en colecciones aisladas para pruebas" placement="bottom">
-              <Chip 
-                size="sm" 
-                variant="flat" 
+              <Chip
+                size="sm"
+                variant="flat"
                 className="bg-amber-100 text-amber-900 border border-amber-300 font-mono text-[11px] font-semibold px-2.5 py-1 rounded-full"
               >
                 🧪 Modo Pruebas
+              </Chip>
+            </Tooltip>
+          )}
+
+          {/* Indicador de Sesión de Prueba (login sin Google/Outlook) */}
+          {isTestSession && (
+            <Tooltip content="Sesión simulada, no es una cuenta real" placement="bottom">
+              <Chip
+                size="sm"
+                variant="flat"
+                className="bg-fuchsia-100 text-fuchsia-900 border border-fuchsia-300 font-mono text-[11px] font-semibold px-2.5 py-1 rounded-full"
+              >
+                🧑‍💻 Rol de prueba: {role}
               </Chip>
             </Tooltip>
           )}

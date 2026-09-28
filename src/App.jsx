@@ -14,6 +14,8 @@ import { DatosGrupoProvider } from './components/contexts/grupoContext.jsx';
 import { GroupSelectorRenamer } from './components/GroupSelectorRenamer.jsx';
 import PredicacionEditor from './components/PredicacionEditor.jsx';
 import PredicacionView from './components/PredicacionView.jsx';
+import { PendingApproval } from './components/PendingApproval.jsx';
+import CasasNoVisitarAdmin from './components/CasasNoVisitarAdmin.jsx';
 
 function App() {
 
@@ -24,19 +26,29 @@ function App() {
             <BrowserRouter>
               <Routes>
 
+                <Route path='/pending-approval' element={<PendingApproval/>} />
+
                 <Route path="/" element={<PrivateRoutes/>}>
                   <Route index element={<Home/>}/>
                   <Route path='home' element={<Home/>}/>
+                  <Route path='/predicacion' element={<PredicacionView/>}/>
+                  <Route path='*' element={<ErrorPage/>}/>
+                </Route>
+
+                <Route path="/" element={<PrivateRoutes minRole='admin'/>}>
                   <Route path='/grupo' element={<GroupSelector/>}/>
                   <Route path='/foliotable' element={<FolioTable/>}/>
                   <Route path='/grouprenamer' element={<GroupSelectorRenamer/>}/>
                   <Route path='/pdfvisualizer' element={<PDFVisualizer/>}/>
                   <Route path='/pdfpageinfoedit' element={<PDFPageInfoEdit />} />
-                  <Route path='/adminpanel' element={<AdminPanel/>}/>
-                  <Route path='/predicacion' element={<PredicacionView/>}/>
                   <Route path='/predicacioneditor' element={<PredicacionEditor/>}/>
-                  <Route path='*' element={<ErrorPage/>}/>
+                  <Route path='/casasnovisitar' element={<CasasNoVisitarAdmin/>}/>
                 </Route>
+
+                <Route path="/" element={<PrivateRoutes minRole='manager'/>}>
+                  <Route path='/adminpanel' element={<AdminPanel/>}/>
+                </Route>
+
                   <Route path='/login' element={<LoginPage/>}/>
 
               </Routes>
