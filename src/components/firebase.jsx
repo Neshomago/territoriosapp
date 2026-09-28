@@ -7,6 +7,7 @@ import {
   getFirestore
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -39,14 +40,18 @@ try {
 
 export const db = firestoreDb;
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
 // 🧪 Configuración de Colecciones para Modo Pruebas (Aislamiento de datos reales)
 // Por defecto en local usamos las colecciones de test para no alterar datos de producción
-export const IS_TEST_MODE = true;
+export const IS_TEST_MODE = false;
 
 export const COLLECTIONS = {
   TERRITORIES: IS_TEST_MODE ? 'territories_test' : 'territories',
   FOLIO_RECORDS: IS_TEST_MODE ? 'folio_records_test' : 'folio_records',
   LEGACY_FOLIO: IS_TEST_MODE ? 'folio_legacy_test' : 'folioAlboradaEste',
+  ARREGLO_PREDICACION: IS_TEST_MODE ? 'arregloPredicacion_test' : 'arregloPredicacion',
+  LUGARES_PREDICACION: IS_TEST_MODE ? 'lugares_predicacion_test' : 'lugares_predicacion',
+  CASAS_NO_VISITAR: IS_TEST_MODE ? 'casas_no_visitar_test' : 'casas_no_visitar',
   USERS: 'users'
 };
