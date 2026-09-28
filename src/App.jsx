@@ -15,6 +15,7 @@ import { GroupSelectorRenamer } from './components/GroupSelectorRenamer.jsx';
 import PredicacionEditor from './components/PredicacionEditor.jsx';
 import PredicacionView from './components/PredicacionView.jsx';
 import { PendingApproval } from './components/PendingApproval.jsx';
+import CasasNoVisitarAdmin from './components/CasasNoVisitarAdmin.jsx';
 
 function App() {
 
@@ -41,6 +42,7 @@ function App() {
                   <Route path='/pdfvisualizer' element={<PDFVisualizer/>}/>
                   <Route path='/pdfpageinfoedit' element={<PDFPageInfoEdit />} />
                   <Route path='/predicacioneditor' element={<PredicacionEditor/>}/>
+                  <Route path='/casasnovisitar' element={<CasasNoVisitarAdmin/>}/>
                 </Route>
 
                 <Route path="/" element={<PrivateRoutes minRole='manager'/>}>

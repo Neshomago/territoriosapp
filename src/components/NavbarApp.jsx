@@ -139,8 +139,18 @@ const NavbarApp = () => {
                     Editar Predicación
                   </DropdownItem>
                 )}
-                <DropdownItem 
-                  key="logout" 
+                {isAdmin && (
+                  <DropdownItem
+                    key="casas-no-visitar"
+                    startContent={<span className="material-symbols-outlined text-[20px] text-primary">block</span>}
+                    onPress={() => navigate('/casasnovisitar')}
+                    className="rounded-xl my-0.5 font-medium"
+                  >
+                    Casas No Visitar
+                  </DropdownItem>
+                )}
+                <DropdownItem
+                  key="logout"
                   color="danger" 
                   className="text-danger rounded-xl mt-1 border-t border-surface-container pt-2 font-semibold"
                   startContent={<span className="material-symbols-outlined text-[20px]">logout</span>}

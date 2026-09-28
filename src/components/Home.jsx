@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Card,
   CardHeader,
@@ -17,19 +17,33 @@ import {
   Avatar,
   AvatarGroup
 } from '@heroui/react';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './AuthProvider';
+import { db, COLLECTIONS } from './firebase';
 import NavbarApp from './NavbarApp';
 import FooterNavbar from './FooterNavbar';
 import TerritorioDelDiaCard from './TerritorioDelDiaCard';
+import ImagePreviewModal from './ImagePreviewModal';
 import { useDatosGrupoContext } from './contexts/grupoContext';
 import { roleAtLeast } from './utils/userAccess';
+
+function getUbicacion(casa) {
+  if (casa.grupo && casa.territorioKey && casa.manzanaName) {
+    return `${casa.grupo} · ${casa.manzanaName}`;
+  }
+  if (casa.etapa) {
+    return `Etapa ${casa.etapa} · Mz ${casa.mz || "?"}`;
+  }
+  return "Sin ubicar";
+}
 
 export const Home = () => {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { nombreGrupo, folioRecords, territorioActivo } = useDatosGrupoContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
   const isAdmin = roleAtLeast(profile, 'admin');
 
   const handleGrupos = () => {
@@ -44,35 +58,32 @@ export const Home = () => {
     navigate('/pdfvisualizer');
   };
 
-  // Casas No Predicar Data
-  const casasNoPredicar = [
-    { id: '1', etapa: '4ta', mz: 'EC', villa: '6', ref: 'Al lado del hno. Otto', fecha: '08-Jul-2025' },
-    { id: '2', etapa: '4ta', mz: 'DP', villa: '6 o 12', ref: 'Tercera casa a la izquierda de la villa 9', fecha: '19-Jul-2025' },
-    { id: '3', etapa: '4ta', mz: 'DC', villa: '2', ref: 'No tocar timbre', fecha: '07-Jul-2025' },
-    { id: '4', etapa: '4ta', mz: 'FO', villa: '??', ref: 'Techo rojo al lado de hna Norika', fecha: '16-Jul-2025' },
-    { id: '5', etapa: '4ta', mz: 'DC', villa: '11', ref: 'Perro guardián en entrada', fecha: '02-Ago-2025' },
-    { id: '6', etapa: '4ta', mz: 'DM', villa: '6', ref: 'Solicita no ser visitado', fecha: '06-Ago-2025' },
-    { id: '7', etapa: '4ta', mz: 'FL', villa: '6', ref: 'Hablan inglés únicamente', fecha: '06-Ago-2025' },
-    { id: '8', etapa: '5ta', mz: 'CX', villa: '2', ref: 'Horario especial tarde', fecha: '02-Ago-2025' },
-    { id: '9', etapa: '9na', mz: '934', villa: '1', ref: 'Frente al parque central', fecha: '26-Jul-2025' },
-    { id: '10', etapa: '9na', mz: '928', villa: '15', ref: 'Portón negro', fecha: '02-Ago-2025' },
-    { id: '11', etapa: '5ta', mz: 'IF', villa: '9', ref: 'No desea lo visiten', fecha: '15-Ago-2026' },
-    { id: '12', etapa: '9na', mz: '19', villa: '3', ref: 'No desea ser visitado', fecha: '29-Nov-2026' },
-    { id: '13', etapa: '9na', mz: '20', villa: '7', ref: 'No desea ser visitado', fecha: '29-Nov-2026' },
-    { id: '14', etapa: '9na', mz: '21', villa: '23', ref: 'No desea ser visitado', fecha: '29-Nov-2026' },
-    { id: '15', etapa: '9na', mz: '913', villa: '19', ref: 'Edificio departamentos', fecha: '3-Ene-2026' },
-    { id: '16', etapa: '5ta', mz: 'IG', villa: '8', ref: 'No desea lo visiten', fecha: '15-Ago-2026' },
-    { id: '17', etapa: '11va', mz: '28', villa: '9 y 10', ref: 'Atrás de la hermana Zúñiga', fecha: '16-Abr-2026' },
-    { id: '18', etapa: '9na', mz: '948', villa: '4', ref: 'No desea ser visitado', fecha: '07-Jul-2026' },
-    { id: '19', etapa: '5ta', mz: 'IE', villa: '1', ref: 'No desea lo visiten', fecha: '15-Ago-2026' },
-  ];
+  const [casasNoPredicar, setCasasNoPredicar] = useState([]);
 
-  const filteredCasas = casasNoPredicar.filter(c =>
-    c.etapa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.mz.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.villa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.ref.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, COLLECTIONS.CASAS_NO_VISITAR),
+      (snapshot) => {
+        setCasasNoPredicar(
+          snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+        );
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  const filteredCasas = casasNoPredicar.filter(c => {
+    const term = searchTerm.toLowerCase();
+    return (
+      (c.etapa || '').toLowerCase().includes(term) ||
+      (c.mz || '').toLowerCase().includes(term) ||
+      (c.villa || '').toLowerCase().includes(term) ||
+      (c.ref || '').toLowerCase().includes(term) ||
+      (c.grupo || '').toLowerCase().includes(term) ||
+      (c.manzanaName || '').toLowerCase().includes(term)
+    );
+  });
 
   return (
     <>
@@ -409,20 +420,33 @@ export const Home = () => {
               }}
             >
               <TableHeader>
-                <TableColumn>ETAPA</TableColumn>
-                <TableColumn>MANZANA</TableColumn>
+                <TableColumn>UBICACIÓN</TableColumn>
                 <TableColumn>VILLA</TableColumn>
                 <TableColumn>REFERENCIA Y MOTIVO</TableColumn>
-                {/* <TableColumn>FECHA REGISTRO</TableColumn> */}
+                <TableColumn>FOTO</TableColumn>
               </TableHeader>
               <TableBody emptyContent="No se encontraron casas con el criterio de búsqueda">
                 {filteredCasas.map((casa) => (
                   <TableRow key={casa.id} className="hover:bg-surface-container-lowest transition-colors border-b border-surface-container last:border-none">
-                    <TableCell className="font-semibold text-primary">{casa.etapa}</TableCell>
-                    <TableCell className="font-mono font-bold">{casa.mz}</TableCell>
+                    <TableCell className="font-semibold text-primary">{getUbicacion(casa)}</TableCell>
                     <TableCell className="font-mono">{casa.villa}</TableCell>
                     <TableCell className="text-on-surface-variant font-medium">{casa.ref}</TableCell>
-                    {/* <TableCell className="font-mono text-on-surface-variant/80">{casa.fecha}</TableCell> */}
+                    <TableCell>
+                      {casa.imagenUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setPreviewImage(casa.imagenUrl)}
+                        >
+                          <img
+                            src={casa.imagenUrl}
+                            alt="Foto de la casa"
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        </button>
+                      ) : (
+                        <span className="text-on-surface-variant/60">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -543,6 +567,11 @@ export const Home = () => {
       </main>
 
       <FooterNavbar />
+
+      <ImagePreviewModal
+        imageUrl={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </>
   );
 };

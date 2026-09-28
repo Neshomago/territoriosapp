@@ -8,6 +8,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db, COLLECTIONS } from "./firebase";
+import ImagePreviewModal from "./ImagePreviewModal";
 
 // Grupo fijo por día de la semana (getDay(): 0=Domingo ... 6=Sábado).
 // No es editable por el usuario, es el calendario oficial del sistema.
@@ -51,7 +52,9 @@ export default function TerritorioDelDiaCard() {
   const [territorioData, setTerritorioData] = useState(null);
   const [entradasSabado, setEntradasSabado] = useState([]);
   const [lugares, setLugares] = useState({});
+  const [casasNoVisitar, setCasasNoVisitar] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewImage, setPreviewImage] = useState(null);
 
   // Lunes a viernes: escuchar el documento del grupo que corresponde hoy.
   useEffect(() => {
@@ -68,6 +71,28 @@ export default function TerritorioDelDiaCard() {
       },
       () => setLoading(false)
     );
+
+    return () => unsubscribe();
+  }, [grupoHoy]);
+
+  // Casas no visitar vinculadas al grupo de hoy, para mostrarlas junto al
+  // territorio correspondiente más abajo.
+  useEffect(() => {
+    if (!grupoHoy) {
+      setCasasNoVisitar([]);
+      return undefined;
+    }
+
+    const q = query(
+      collection(db, COLLECTIONS.CASAS_NO_VISITAR),
+      where("grupo", "==", grupoHoy)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCasasNoVisitar(
+        snapshot.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }))
+      );
+    });
 
     return () => unsubscribe();
   }, [grupoHoy]);
@@ -116,6 +141,51 @@ export default function TerritorioDelDiaCard() {
     return () => unsubscribe();
   }, [dayOfWeek, today]);
 
+  const renderCasasNoVisitar = (area) => {
+    if (casasNoVisitar.length === 0) return null;
+
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
+        <p className="mb-2 text-xs font-semibold text-red-600">
+          🚫 Casas no visitar en {grupoHoy}
+        </p>
+        <div className="space-y-2">
+          {casasNoVisitar.map((casa) => {
+            const territorioNombre =
+              area[casa.territorioKey]?.name || casa.territorioKey;
+
+            return (
+              <div
+                key={casa.id}
+                className="flex items-center gap-3 rounded-lg bg-white p-2"
+              >
+                {casa.imagenUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewImage(casa.imagenUrl)}
+                  >
+                    <img
+                      src={casa.imagenUrl}
+                      alt="Foto de la casa"
+                      className="h-12 w-12 rounded-lg object-cover border border-red-200"
+                    />
+                  </button>
+                ) : (
+                  <div className="h-12 w-12 rounded-lg bg-red-100 border border-red-200" />
+                )}
+                <p className="text-xs text-on-surface">
+                  {territorioNombre} · Manzana{" "}
+                  <strong>{casa.manzanaName}</strong> · Villa{" "}
+                  <strong>{casa.villa || "?"}</strong>
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const renderWeekday = () => {
     const area = territorioData?.mapa?.area || {};
     const todayFormatted = formatDate(today);
@@ -124,48 +194,48 @@ export default function TerritorioDelDiaCard() {
       ([, data]) => data.fechaInicio === todayFormatted
     );
 
-    if (iniciadosHoy.length === 0) {
-      return (
-        <p className="text-sm text-on-surface-variant">
-          Ningún territorio de {grupoHoy} se ha iniciado hoy.
-        </p>
-      );
-    }
-
     return (
       <div className="space-y-3">
-        {iniciadosHoy.map(([areaKey, data]) => {
-          const manzanas = Array.isArray(data.manzanas) ? data.manzanas : [];
-          const completadas = manzanas.filter((m) => m.completed).length;
-          const total = manzanas.length;
-          const progreso = total > 0 ? (completadas / total) * 100 : 0;
+        {iniciadosHoy.length === 0 ? (
+          <p className="text-sm text-on-surface-variant">
+            Ningún territorio de {grupoHoy} se ha iniciado hoy.
+          </p>
+        ) : (
+          iniciadosHoy.map(([areaKey, data]) => {
+            const manzanas = Array.isArray(data.manzanas) ? data.manzanas : [];
+            const completadas = manzanas.filter((m) => m.completed).length;
+            const total = manzanas.length;
+            const progreso = total > 0 ? (completadas / total) * 100 : 0;
 
-          return (
-            <div
-              key={areaKey}
-              className="rounded-xl border border-surface-container p-3"
-            >
-              <p className="text-sm font-semibold text-on-surface">
-                {data.name || areaKey}
-              </p>
-              <p className="text-xs text-on-surface-variant">
-                Asignado a {data.user || "Sin asignar"} · Iniciado{" "}
-                {data.fechaInicio}
-              </p>
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
-                  <div
-                    className="h-full bg-primary"
-                    style={{ width: `${progreso}%` }}
-                  />
+            return (
+              <div
+                key={areaKey}
+                className="rounded-xl border border-surface-container p-3"
+              >
+                <p className="text-sm font-semibold text-on-surface">
+                  {data.name || areaKey}
+                </p>
+                <p className="text-xs text-on-surface-variant">
+                  Asignado a {data.user || "Sin asignar"} · Iniciado{" "}
+                  {data.fechaInicio}
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="flex-1 h-2 rounded-full bg-surface-container overflow-hidden">
+                    <div
+                      className="h-full bg-primary"
+                      style={{ width: `${progreso}%` }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono text-on-surface-variant">
+                    {completadas}/{total}
+                  </span>
                 </div>
-                <span className="text-xs font-mono text-on-surface-variant">
-                  {completadas}/{total}
-                </span>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
+
+        {renderCasasNoVisitar(area)}
       </div>
     );
   };
@@ -249,6 +319,11 @@ export default function TerritorioDelDiaCard() {
           renderWeekday()
         )}
       </div>
+
+      <ImagePreviewModal
+        imageUrl={previewImage}
+        onClose={() => setPreviewImage(null)}
+      />
     </section>
   );
 }

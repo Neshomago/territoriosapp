@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   collection,
   deleteDoc,
@@ -96,6 +96,74 @@ export default function PredicacionEditor() {
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+
+  // Escritura diferida: mientras se escribe en Horario/Asignado, el valor
+  // se guarda localmente y solo se envía a Firestore ~600ms después de la
+  // última tecla (o de inmediato si el campo pierde foco o la pestaña se
+  // oculta), en vez de un guardado por cada tecla.
+  const DEBOUNCE_MS = 600;
+  const [fieldDrafts, setFieldDrafts] = useState({});
+  const pendingCommitsRef = useRef({});
+
+  const getDraftValue = (key, fallback) =>
+    key in fieldDrafts ? fieldDrafts[key] : fallback;
+
+  const runCommit = (key) => {
+    const pending = pendingCommitsRef.current[key];
+    if (!pending) return;
+
+    delete pendingCommitsRef.current[key];
+
+    pending.commit().finally(() => {
+      setFieldDrafts((prev) => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    });
+  };
+
+  const scheduleFieldChange = (key, value, commit) => {
+    setFieldDrafts((prev) => ({ ...prev, [key]: value }));
+
+    if (pendingCommitsRef.current[key]) {
+      clearTimeout(pendingCommitsRef.current[key].timer);
+    }
+
+    const timer = setTimeout(() => runCommit(key), DEBOUNCE_MS);
+    pendingCommitsRef.current[key] = { timer, commit };
+  };
+
+  const flushField = (key) => {
+    if (pendingCommitsRef.current[key]) {
+      clearTimeout(pendingCommitsRef.current[key].timer);
+    }
+    runCommit(key);
+  };
+
+  // Si se cambia de pestaña/app o se cierra la página con algo pendiente
+  // de guardar, se envía de inmediato en vez de esperar el debounce.
+  useEffect(() => {
+    const flushAllPending = () => {
+      Object.keys(pendingCommitsRef.current).forEach((key) => {
+        clearTimeout(pendingCommitsRef.current[key].timer);
+        runCommit(key);
+      });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) flushAllPending();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", flushAllPending);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", flushAllPending);
+    };
+  }, []);
 
   useEffect(() => {
     const weeklyQuery = query(
@@ -617,13 +685,19 @@ export default function PredicacionEditor() {
 
                     <input
                       type="text"
-                      value={item.horario || ""}
+                      value={getDraftValue(
+                        `semanal:${dia}:horario`,
+                        item.horario || ""
+                      )}
                       onChange={(e) =>
-                        updateWeekly(
-                          dia,
-                          "horario",
-                          e.target.value
+                        scheduleFieldChange(
+                          `semanal:${dia}:horario`,
+                          e.target.value,
+                          () => updateWeekly(dia, "horario", e.target.value)
                         )
+                      }
+                      onBlur={() =>
+                        flushField(`semanal:${dia}:horario`)
                       }
                       placeholder="Ej. 8:30"
                       className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
@@ -662,13 +736,19 @@ export default function PredicacionEditor() {
 
                     <input
                       type="text"
-                      value={item.asignado || ""}
+                      value={getDraftValue(
+                        `semanal:${dia}:asignado`,
+                        item.asignado || ""
+                      )}
                       onChange={(e) =>
-                        updateWeekly(
-                          dia,
-                          "asignado",
-                          e.target.value
+                        scheduleFieldChange(
+                          `semanal:${dia}:asignado`,
+                          e.target.value,
+                          () => updateWeekly(dia, "asignado", e.target.value)
                         )
+                      }
+                      onBlur={() =>
+                        flushField(`semanal:${dia}:asignado`)
                       }
                       placeholder="Nombre"
                       className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none transition focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
@@ -876,13 +956,27 @@ export default function PredicacionEditor() {
 
                                   <input
                                     type="text"
-                                    value={item.asignado || ""}
-                                    onChange={(e) =>
-                                      updateSaturday(
-                                        dateString,
-                                        item.orden || entryIdx + 1,
-                                        "asignado",
-                                        e.target.value
+                                    value={getDraftValue(
+                                      `mensual:${dateString}:${item.orden || entryIdx + 1}:asignado`,
+                                      item.asignado || ""
+                                    )}
+                                    onChange={(e) => {
+                                      const orden = item.orden || entryIdx + 1;
+                                      scheduleFieldChange(
+                                        `mensual:${dateString}:${orden}:asignado`,
+                                        e.target.value,
+                                        () =>
+                                          updateSaturday(
+                                            dateString,
+                                            orden,
+                                            "asignado",
+                                            e.target.value
+                                          )
+                                      );
+                                    }}
+                                    onBlur={() =>
+                                      flushField(
+                                        `mensual:${dateString}:${item.orden || entryIdx + 1}:asignado`
                                       )
                                     }
                                     placeholder="Nombre"
