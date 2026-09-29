@@ -1,12 +1,22 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@heroui/react';
 import { useAuth } from './AuthProvider';
 
 export const PendingApproval = () => {
-  const { profile, logout } = useAuth();
+  const { profile, isApproved, loadingProfile, logout } = useAuth();
   const navigate = useNavigate();
 
   const isRejected = profile?.status === 'rejected';
+
+  // Si por una carga en frío se llega aquí con un perfil que en realidad
+  // ya está aprobado (o se aprueba mientras la pantalla está abierta), se
+  // sale automáticamente en vez de dejar a la persona atascada.
+  useEffect(() => {
+    if (!loadingProfile && isApproved) {
+      navigate('/home', { replace: true });
+    }
+  }, [isApproved, loadingProfile, navigate]);
 
   const handleLogout = async () => {
     await logout();
