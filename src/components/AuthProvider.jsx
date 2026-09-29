@@ -80,6 +80,17 @@ export const AuthProvider = ({children}) => {
 
         const userDocRef = doc(db, COLLECTIONS.USERS, user.uid);
         const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+            // En una carga en frío, el primer snapshot puede venir del
+            // cache local sin confirmar con el servidor y reportar
+            // "no existe" antes de sincronizar (por ejemplo justo después
+            // de restaurar la sesión de Firebase Auth). Si pasa eso, se
+            // espera la confirmación real en vez de tratarlo como
+            // definitivo, para no mandar a un usuario aprobado a la
+            // pantalla de pendiente de aprobación por un falso negativo.
+            if (!snapshot.exists() && snapshot.metadata.fromCache) {
+                return;
+            }
+
             setProfile(snapshot.exists() ? snapshot.data() : null);
             setLoadingProfile(false);
         });
