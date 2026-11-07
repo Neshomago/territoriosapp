@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#312e81"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="400" fill="url(#sky)"/>
+  <g fill="#c7d2fe">
+    <ellipse cx="400" cy="150" rx="220" ry="66"/>
+    <circle cx="300" cy="108" r="70"/>
+    <circle cx="450" cy="98" r="88"/>
+    <circle cx="540" cy="120" r="62"/>
+  </g>
+  <polygon points="400,220 356,300 396,300 368,372 446,276 406,276 436,220" fill="#facc15"/>
+  <g stroke="#e0e7ff" stroke-width="6" stroke-linecap="round" opacity="0.8">
+    <line x1="230" y1="250" x2="212" y2="312"/>
+    <line x1="300" y1="256" x2="282" y2="318"/>
+    <line x1="500" y1="256" x2="482" y2="318"/>
+    <line x1="570" y1="250" x2="552" y2="312"/>
+  </g>
+</svg>

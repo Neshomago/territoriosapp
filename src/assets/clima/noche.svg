@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <mask id="moonMask">
+      <rect width="800" height="400" fill="#ffffff"/>
+      <circle cx="654" cy="86" r="64" fill="#000000"/>
+    </mask>
+  </defs>
+  <rect width="800" height="400" fill="url(#sky)"/>
+  <g fill="#f8fafc">
+    <circle cx="120" cy="70" r="3"/>
+    <circle cx="210" cy="130" r="2"/>
+    <circle cx="300" cy="60" r="3"/>
+    <circle cx="380" cy="150" r="2"/>
+    <circle cx="470" cy="80" r="2.5"/>
+    <circle cx="700" cy="190" r="2"/>
+    <circle cx="560" cy="40" r="2"/>
+    <circle cx="80" cy="190" r="2.5"/>
+    <circle cx="250" cy="220" r="2"/>
+  </g>
+  <circle cx="620" cy="120" r="72" fill="#fef9c3" mask="url(#moonMask)"/>
+  <g fill="#e2e8f0" opacity="0.5">
+    <ellipse cx="200" cy="330" rx="120" ry="38"/>
+    <ellipse cx="470" cy="350" rx="100" ry="32"/>
+  </g>
+</svg>
