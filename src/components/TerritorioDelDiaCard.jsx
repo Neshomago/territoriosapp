@@ -52,6 +52,7 @@ export default function TerritorioDelDiaCard() {
   const [territorioData, setTerritorioData] = useState(null);
   const [entradasSabado, setEntradasSabado] = useState([]);
   const [lugares, setLugares] = useState({});
+  const [lugarHoy, setLugarHoy] = useState(null);
   const [casasNoVisitar, setCasasNoVisitar] = useState([]);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
@@ -141,6 +142,33 @@ export default function TerritorioDelDiaCard() {
     return () => unsubscribe();
   }, [dayOfWeek, today]);
 
+  // Lunes a viernes: resolver el lugar de predicación del día desde el
+  // arreglo semanal, para mostrarlo como botón a Google Maps.
+  useEffect(() => {
+    if (dayOfWeek === 0 || dayOfWeek === 6) return undefined;
+
+    const q = query(
+      collection(db, COLLECTIONS.ARREGLO_PREDICACION),
+      where("tipo", "==", "semanal"),
+      where("dia", "==", NOMBRES_DIA[dayOfWeek])
+    );
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const lugarId = snapshot.docs[0]?.data()?.lugarId;
+      if (!lugarId) {
+        setLugarHoy(null);
+        return;
+      }
+
+      const lugarSnap = await getDoc(
+        doc(db, COLLECTIONS.LUGARES_PREDICACION, lugarId)
+      );
+      setLugarHoy(lugarSnap.exists() ? lugarSnap.data() : null);
+    });
+
+    return () => unsubscribe();
+  }, [dayOfWeek]);
+
   const renderCasasNoVisitar = (area) => {
     if (casasNoVisitar.length === 0) return null;
 
@@ -183,6 +211,27 @@ export default function TerritorioDelDiaCard() {
           })}
         </div>
       </div>
+    );
+  };
+
+  const renderLugarButton = (lugar) => {
+    if (!lugar?.mapsUrl) return null;
+
+    return (
+      <a
+        href={lugar.mapsUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+      >
+        <span className="material-symbols-outlined text-[16px]">
+          location_on
+        </span>
+        {lugar.nombre}
+        <span className="material-symbols-outlined text-[16px]">
+          open_in_new
+        </span>
+      </a>
     );
   };
 
@@ -230,6 +279,35 @@ export default function TerritorioDelDiaCard() {
                     {completadas}/{total}
                   </span>
                 </div>
+                <div className="mt-3">
+                  <p className="mb-2 text-xs font-mono font-semibold uppercase tracking-wider text-on-surface-variant">
+                    Manzanas ({total})
+                  </p>
+                  <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                    {manzanas.map((m, index) => {
+                      const isChecked = Boolean(m.completed);
+
+                      return (
+                        <div
+                          key={m.name ?? index}
+                          title={isChecked ? "Completada" : "Pendiente"}
+                          className={`flex items-center justify-center gap-1 rounded-xl border px-2 py-1.5 text-xs font-mono font-bold ${
+                            isChecked
+                              ? "bg-primary text-white border-primary"
+                              : "bg-surface-container-low text-on-surface border-surface-container"
+                          }`}
+                        >
+                          {isChecked && (
+                            <span className="material-symbols-outlined text-[13px]">
+                              check
+                            </span>
+                          )}
+                          <span>{m.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             );
           })
@@ -269,14 +347,7 @@ export default function TerritorioDelDiaCard() {
               </p>
               <p className="text-xs mt-1">
                 {lugar ? (
-                  <a
-                    href={lugar.mapsUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-primary underline"
-                  >
-                    {lugar.nombre}
-                  </a>
+                  renderLugarButton(lugar)
                 ) : (
                   <span className="text-on-surface-variant">
                     Sin lugar asignado
@@ -297,7 +368,7 @@ export default function TerritorioDelDiaCard() {
           <span className="material-symbols-outlined text-primary text-[28px]">
             today
           </span>
-          <div>
+          <div className="flex-1">
             <p className="text-xs font-mono font-semibold text-on-surface-variant uppercase tracking-wider">
               Hoy · {NOMBRES_DIA[dayOfWeek]}
             </p>
@@ -305,6 +376,7 @@ export default function TerritorioDelDiaCard() {
               Territorio del día
             </h2>
           </div>
+          {renderLugarButton(lugarHoy)}
         </div>
 
         {loading ? (
